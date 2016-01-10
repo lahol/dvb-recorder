@@ -3,7 +3,7 @@ LD = gcc
 PKG_CONFIG := pkg-config
 
 CFLAGS = -Wall -g `$(PKG_CONFIG) --cflags glib-2.0 gtk+-3.0 gdk-3.0 x11`
-LIBS   = `$(PKG_CONFIG) --libs glib-2.0 gtk+-3.0 gdk-3.0 x11` -lsqlite3 -ldvbrecorder
+LIBS   = `$(PKG_CONFIG) --libs glib-2.0 gtk+-3.0 gdk-3.0 x11` -lsqlite3 -ldvbrecorder -lpng
 
 ifdef GSTREAMER010
 	CFLAGS += `$(PKG_CONFIG) --cflags gstreamer-0.10 gstreamer-interfaces-0.10 gstreamer-base-0.10`

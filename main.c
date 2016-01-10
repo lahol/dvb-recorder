@@ -22,6 +22,14 @@ struct {
     DVBRecorder *recorder;
 } appdata;
 
+gchar *main_get_snapshot_dir(void)
+{
+    gchar *dir = NULL;
+
+    /* read from config */
+    return g_strdup("/tmp");
+}
+
 static void main_quit(GtkWidget *widget, gpointer data)
 {
     gtk_main_quit();
@@ -41,6 +49,27 @@ void main_toggle_fullscreen(void)
     }
 }
 
+void main_action_snapshot(void)
+{
+    gchar fbuf[256];
+    time_t t;
+    struct tm *tmp;
+    t = time(NULL);
+    tmp = localtime(&t);
+
+    gchar *snapshot_dir = main_get_snapshot_dir();
+    strftime(fbuf, 256, "snapshot-%Y%m%d-%H%M%S.png", tmp);
+    gchar *filename = g_build_filename(
+            snapshot_dir,
+            fbuf,
+            NULL);
+    g_free(snapshot_dir);
+
+    video_output_snapshot(appdata.video_output, filename);
+
+    g_free(filename);
+}
+
 static gboolean main_key_event(GtkWidget *widget, GdkEventKey *event, gpointer data)
 {
     fprintf(stderr, "key event\n");
@@ -55,6 +84,8 @@ static gboolean main_key_event(GtkWidget *widget, GdkEventKey *event, gpointer d
         case GDK_KEY_r:
             break;
         case GDK_KEY_space:
+            if (event->type == GDK_KEY_RELEASE)
+                main_action_snapshot();
             break;
         default:
             return TRUE;

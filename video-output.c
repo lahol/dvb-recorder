@@ -16,6 +16,7 @@
 #include <gdk/gdkx.h>
 
 #include "video-output.h"
+#include "utils.h"
 
 struct _VideoOutput {
     GtkWidget *drawing_area;
@@ -106,6 +107,120 @@ void video_output_set_infile(VideoOutput *vo, int fd)
     if (vo->infile != -1) {
         video_output_stream_start(vo);
     }
+}
+
+gboolean video_output_snapshot(VideoOutput *vo, const gchar *filename)
+{
+    GstCaps *caps = NULL;
+    GstStructure *s;
+    gint width = 0, height = 0, bpp = 0;
+    gboolean result = FALSE;
+
+#if GST_CHECK_VERSION(1, 0, 0)
+    GstSample *sample = NULL;
+    GstBuffer *buffer = NULL;
+    GstMemory *memory = NULL;
+
+    caps = gst_caps_new_simple("video/x-raw",
+            "format", G_TYPE_STRING, "RGB",
+            "pixel-aspect-ratio", GST_TYPE_FRACTION, 1, 1,
+            NULL);
+
+    g_signal_emit_by_name(vo->playsink, "convert-sample", caps, &sample);
+    gst_caps_unref(caps);
+    caps = NULL;
+
+    if (sample == NULL)
+        goto error;
+
+    caps = gst_sample_get_caps(sample);
+    if (caps == NULL)
+        goto error;
+
+    gchar *strcaps = gst_caps_to_string(caps);
+    fprintf(stderr, "Buffer caps: %s\n", strcaps);
+    g_free(strcaps);
+
+    s = gst_caps_get_structure(caps, 0);
+    gst_structure_get_int(s, "width", &width);
+    gst_structure_get_int(s, "height", &height);
+    bpp = 24;
+    
+    fprintf(stderr, "w: %d, h: %d, bpp: %d\n", width, height, bpp);
+
+
+    buffer = gst_sample_get_buffer(sample);
+    if (buffer == NULL)
+        goto error;
+
+    memory = gst_buffer_get_all_memory(buffer);
+    if (memory == NULL)
+        goto error;
+
+    fprintf(stderr, "memory: %p\n", memory);
+    GstMapInfo mapinfo;
+    gst_memory_map(memory, &mapinfo, GST_MAP_READ);
+
+    fprintf(stderr, "memory size: %zd\n", mapinfo.size);
+
+    if (!util_write_data_to_png(filename, mapinfo.data, width, height, bpp)) {
+        gst_memory_unmap(memory, &mapinfo);
+        goto error;
+    }
+
+    gst_memory_unmap(memory, &mapinfo);
+
+    result = TRUE;
+
+error:
+    if (memory)
+        gst_memory_unref(memory);
+    if (sample)
+        gst_sample_unref(sample);
+    
+    return result;
+    
+#else
+    GstBuffer *buffer = NULL;
+
+    caps = gst_caps_new_simple("video/x-raw-rgb",
+            "format", G_TYPE_STRING, "RGB",
+            "pixel-aspect-ratio", GST_TYPE_FRACTION, 1, 1,
+            NULL);
+
+    g_signal_emit_by_name(vo->playsink, "convert-frame", caps, &buffer);
+    gst_caps_unref(caps);
+    caps = NULL;
+
+    if (buffer == NULL)
+        goto error;
+
+    caps = gst_buffer_get_caps(buffer);
+    if (caps == NULL)
+        goto error;
+
+    gchar *strcaps = gst_caps_to_string(caps);
+    fprintf(stderr, "Buffer caps: %s\n", strcaps);
+    g_free(strcaps);
+
+    s = gst_caps_get_structure(caps, 0);
+    gst_structure_get_int(s, "width", &width);
+    gst_structure_get_int(s, "height", &height);
+    gst_structure_get_int(s, "bpp", &bpp);
+
+    if (!util_write_data_to_png(filename, buffer->data, width, height, bpp))
+        goto error;
+
+    result = TRUE;
+
+error:
+    if (caps)
+        gst_caps_unref(caps);
+    if (buffer)
+        gst_buffer_unref(buffer);
+
+    return result;
+#endif
 }
 
 gpointer video_output_thread_proc(VideoOutput *vo)
