@@ -12,6 +12,9 @@
 struct {
     GtkWidget *main_window;
     GtkWidget *drawing_area;
+    GtkWidget *toolbox;
+
+    gboolean fullscreen;
 } widgets;
 
 struct {
@@ -24,11 +27,27 @@ static void main_quit(GtkWidget *widget, gpointer data)
     gtk_main_quit();
 }
 
+void main_toggle_fullscreen(void)
+{
+    if (!widgets.fullscreen) {
+        widgets.fullscreen = TRUE;
+        gtk_widget_hide(widgets.toolbox);
+        gtk_window_fullscreen(GTK_WINDOW(widgets.main_window));
+    }
+    else {
+        widgets.fullscreen = FALSE;
+        gtk_widget_show(widgets.toolbox);
+        gtk_window_unfullscreen(GTK_WINDOW(widgets.main_window));
+    }
+}
+
 static gboolean main_key_event(GtkWidget *widget, GdkEventKey *event, gpointer data)
 {
     fprintf(stderr, "key event\n");
     switch (event->keyval) {
         case GDK_KEY_f:
+            if (event->type == GDK_KEY_RELEASE)
+                main_toggle_fullscreen();
             break;
         case GDK_KEY_q:
             gtk_main_quit();
@@ -78,6 +97,16 @@ void main_init_window(void)
     gtk_widget_show_all(widgets.main_window);
 }
 
+void main_init_toolbox(void)
+{
+    widgets.toolbox = gtk_dialog_new();
+    GtkWidget *content = gtk_dialog_get_content_area(GTK_DIALOG(widgets.toolbox));
+
+    GtkWidget *entry = gtk_entry_new();
+    gtk_container_add(GTK_CONTAINER(content), entry);
+    gtk_widget_show_all(widgets.toolbox);
+}
+
 int main(int argc, char **argv)
 {
     if (!XInitThreads()) {
@@ -89,6 +118,7 @@ int main(int argc, char **argv)
 
     /* setup librecorder */
 
+    main_init_toolbox();
     main_init_window();
     
     appdata.recorder = dvb_recorder_new(NULL, NULL);
