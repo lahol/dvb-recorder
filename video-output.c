@@ -174,7 +174,7 @@ static void video_output_pad_added_handler(GstElement *src, GstPad *new_pad, Vid
     new_pad_struct = gst_caps_get_structure(new_pad_caps, 0);
     new_pad_type = gst_structure_get_name(new_pad_struct);
 
-    g_print("new type: %s\n", new_pad_type);
+    fprintf(stderr, "VideoOutput, pad new type: %s\n", new_pad_type);
 
     GstElementClass *cls = GST_ELEMENT_GET_CLASS(vo->playsink);
     GstPadTemplate *templ = NULL;
