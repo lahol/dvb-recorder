@@ -161,9 +161,6 @@ int main(int argc, char **argv)
     dvb_recorder_set_channel(appdata.recorder, 0);
     video_output_set_infile(appdata.video_output, fd);
 
-    sleep(1);
-    dvb_recorder_start(appdata.recorder);
-
     gtk_main();
 
     fprintf(stderr, "destroying video\n");
