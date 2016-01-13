@@ -298,7 +298,13 @@ void main_recorder_event_callback(DVBRecorder *recorder, DVBRecorderEvent *event
                     appdata.is_recording = 1;
                     break;
                 default:
+                    {
                     appdata.is_recording = 0;
+                    DVBRecorderRecordStatus status;
+                    dvb_recorder_query_record_status(recorder, &status);
+                    fprintf(stderr, "%zd bytes (%.2f MiB), time: %f.0 seconds\n",
+                            status.filesize, ((double)status.filesize)/(1024*1024), status.elapsed_time);
+                    }
                     break;
             }
             break;
