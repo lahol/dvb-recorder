@@ -96,7 +96,8 @@ void main_action_record(void)
 {
     /* will get set by event */
     if (appdata.is_recording) {
-        /* stop record */
+        fprintf(stderr, "Stop recording.\n");
+        dvb_recorder_record_stop(appdata.recorder);
     }
     else {
         gchar fbuf[256];
@@ -113,7 +114,8 @@ void main_action_record(void)
                 NULL);
         g_free(capture_dir);
 
-        /* record */
+        fprintf(stderr, "Start recording.\n");
+        dvb_recorder_record_start(appdata.recorder, filename);
 
         g_free(filename);
     }
@@ -128,6 +130,8 @@ static gboolean main_key_event(GtkWidget *widget, GdkEventKey *event, gpointer d
                 main_toggle_fullscreen();
             break;
         case GDK_KEY_r:
+            if (event->type == GDK_KEY_RELEASE)
+                main_action_record();
             break;
         case GDK_KEY_space:
             if (event->type == GDK_KEY_RELEASE)
@@ -284,6 +288,25 @@ void main_init_toolbox(void)
     gtk_widget_show_all(widgets.toolbox);
 }
 
+void main_recorder_event_callback(DVBRecorder *recorder, DVBRecorderEvent *event, gpointer userdata)
+{
+    switch (event->type) {
+        case DVB_RECORDER_EVENT_RECORD_STATUS_CHANGED:
+            fprintf(stderr, "record status changed: %d\n", ((DVBRecorderEventRecordStatusChanged *)event)->status);
+            switch (((DVBRecorderEventRecordStatusChanged *)event)->status) {
+                case DVB_RECORD_STATUS_RECORDING:
+                    appdata.is_recording = 1;
+                    break;
+                default:
+                    appdata.is_recording = 0;
+                    break;
+            }
+            break;
+        default:
+            break;
+    }
+}
+
 int main(int argc, char **argv)
 {
     if (!XInitThreads()) {
@@ -310,7 +333,7 @@ int main(int argc, char **argv)
     widgets.show_toolbox = 1;
     gtk_window_present(GTK_WINDOW(widgets.main_window));
     
-    appdata.recorder = dvb_recorder_new(NULL, NULL);
+    appdata.recorder = dvb_recorder_new(main_recorder_event_callback, NULL);
     appdata.video_output = video_output_new(widgets.drawing_area);
 
     int fd = dvb_recorder_enable_video_source(appdata.recorder, TRUE);
