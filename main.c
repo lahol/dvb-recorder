@@ -7,7 +7,7 @@
 #include <glib/gi18n.h>
 
 #include "video-output.h"
-#include <dvbrecorder.h>
+#include <dvbrecorder/dvbrecorder.h>
 
 #include "config.h"
 
