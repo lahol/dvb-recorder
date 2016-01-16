@@ -137,6 +137,10 @@ static gboolean main_key_event(GtkWidget *widget, GdkEventKey *event, gpointer d
             if (event->type == GDK_KEY_RELEASE)
                 main_action_snapshot();
             break;
+        case GDK_KEY_t:
+            if (event->type == GDK_KEY_RELEASE)
+                dvb_recorder_set_channel(appdata.recorder, 0);
+            break;
         default:
             return FALSE;
     }
@@ -367,9 +371,9 @@ int main(int argc, char **argv)
 
     int fd = dvb_recorder_enable_video_source(appdata.recorder, TRUE);
     fprintf(stderr, "recorder video source: %d\n", fd);
+    video_output_set_infile(appdata.video_output, fd);
 
     dvb_recorder_set_channel(appdata.recorder, 0);
-    video_output_set_infile(appdata.video_output, fd);
 
     gtk_main();
 
