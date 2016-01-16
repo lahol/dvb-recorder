@@ -288,7 +288,7 @@ void main_init_toolbox(void)
     gtk_widget_show_all(widgets.toolbox);
 }
 
-void main_recorder_event_callback(DVBRecorder *recorder, DVBRecorderEvent *event, gpointer userdata)
+void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
 {
     switch (event->type) {
         case DVB_RECORDER_EVENT_RECORD_STATUS_CHANGED:
@@ -298,13 +298,34 @@ void main_recorder_event_callback(DVBRecorder *recorder, DVBRecorderEvent *event
                     appdata.is_recording = 1;
                     break;
                 default:
-                    {
-                    appdata.is_recording = 0;
-                    DVBRecorderRecordStatus status;
-                    dvb_recorder_query_record_status(recorder, &status);
-                    fprintf(stderr, "%zd bytes (%.2f MiB), time: %f.0 seconds\n",
-                            status.filesize, ((double)status.filesize)/(1024*1024), status.elapsed_time);
+                    if (appdata.is_recording) {
+                        appdata.is_recording = 0;
+                        DVBRecorderRecordStatus status;
+                        dvb_recorder_query_record_status(appdata.recorder, &status);
+                        fprintf(stderr, "%zd bytes (%.2f MiB), time: %f.0 seconds\n",
+                                status.filesize, ((double)status.filesize)/(1024*1024), status.elapsed_time);
                     }
+                    break;
+            }
+            break;
+        case DVB_RECORDER_EVENT_STREAM_STATUS_CHANGED:
+            fprintf(stderr, "stream status changed: %d\n", ((DVBRecorderEventStreamStatusChanged *)event)->status);
+            switch (((DVBRecorderEventStreamStatusChanged *)event)->status) {
+                case DVB_STREAM_STATUS_TUNED:
+                    fprintf(stderr, "dvb-recorder: tuned in\n");
+                    break;
+                case DVB_STREAM_STATUS_TUNE_FAILED:
+                    fprintf(stderr, "dvb-recorder: tune failed\n");
+                    video_output_set_infile(appdata.video_output, -1);
+                    break;
+                case DVB_STREAM_STATUS_STOPPED:
+                    fprintf(stderr, "dvb-recorder: stopped\n");
+                    video_output_set_infile(appdata.video_output, -1);
+                    break;
+                case DVB_STREAM_STATUS_RUNNING:
+                    fprintf(stderr, "dvb-recorder: running\n");
+                    break;
+                default:
                     break;
             }
             break;
@@ -340,6 +361,8 @@ int main(int argc, char **argv)
     gtk_window_present(GTK_WINDOW(widgets.main_window));
     
     appdata.recorder = dvb_recorder_new(main_recorder_event_callback, NULL);
+/*    if (!appdata.recorder)*/
+        
     appdata.video_output = video_output_new(widgets.drawing_area);
 
     int fd = dvb_recorder_enable_video_source(appdata.recorder, TRUE);

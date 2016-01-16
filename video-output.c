@@ -33,6 +33,8 @@ struct _VideoOutput {
     GstElement *playsink;
 
     GThread *thread;
+    GMutex pipeline_mutex;
+    GMutex infile_mutex;
 
     uint32_t write_error : 1;
 };
@@ -54,6 +56,9 @@ VideoOutput *video_output_new(GtkWidget *drawing_area)
     vo->communication_pipe[0] = -1;
     vo->communication_pipe[1] = -1;
 
+    g_mutex_init(&vo->pipeline_mutex);
+    g_mutex_init(&vo->infile_mutex);
+
     return vo;
 }
 
@@ -63,21 +68,28 @@ void video_output_destroy(VideoOutput *vo)
     if (vo == NULL)
         return;
 
+    g_mutex_lock(&vo->infile_mutex);
     video_output_clear_pipeline(vo);
+    g_mutex_unlock(&vo->infile_mutex);
     g_free(vo);
 }
 
 void video_output_stream_start(VideoOutput *vo)
 {
+    fprintf(stderr, "video_output_stream_start\n");
 /*    pipe(vo->communication_pipe);
     pipe(vo->video_pipe);
     vo->thread = g_thread_new("VideoThread", (GThreadFunc)video_output_thread_proc, vo);*/
+    if (vo->infile == -1) {
+        return;
+    }
     video_output_setup_pipeline(vo);
     gst_element_set_state(vo->pipeline, GST_STATE_PLAYING);
 }
 
 void video_output_stream_stop(VideoOutput *vo)
 {
+    fprintf(stderr, "video_output_stream_stop\n");
  /*   if (vo->thread) {
         write(vo->communication_pipe[1], "stop", 4);
         g_thread_join(vo->thread);
@@ -97,9 +109,13 @@ void video_output_stream_stop(VideoOutput *vo)
 
 void video_output_set_infile(VideoOutput *vo, int fd)
 {
+    fprintf(stderr, "video_output_set_infile: %d\n", fd);
     g_return_if_fail(vo != NULL);
 
+    g_mutex_lock(&vo->infile_mutex);
+    fprintf(stderr, "vo->infile: %d\n", vo->infile);
     if (vo->infile != -1) {
+        vo->infile = -1;
         video_output_stream_stop(vo);
     }
 
@@ -107,6 +123,8 @@ void video_output_set_infile(VideoOutput *vo, int fd)
     if (vo->infile != -1) {
         video_output_stream_start(vo);
     }
+
+    g_mutex_unlock(&vo->infile_mutex);
 }
 
 gboolean video_output_snapshot(VideoOutput *vo, const gchar *filename)
@@ -398,17 +416,25 @@ static void video_output_gst_message(GstBus *bus, GstMessage *msg, VideoOutput *
 
 void video_output_setup_pipeline(VideoOutput *vo)
 {
-    if (vo->pipeline)
+    fprintf(stderr, "video_output_setup_pipeline: %p\n", vo->pipeline);
+    g_mutex_lock(&vo->pipeline_mutex);
+    if (vo->pipeline) {
+        g_mutex_unlock(&vo->pipeline_mutex);
         return;
+    }
 
+    fprintf(stderr, "new pipeline\n");
     vo->pipeline = gst_pipeline_new(NULL);
 
+    fprintf(stderr, "make xvimagesink\n");
     vo->vsink = gst_element_factory_make("xvimagesink", "xvimagesink");
     g_object_set(G_OBJECT(vo->vsink), "force-aspect-ratio", TRUE, NULL);
 
+    fprintf(stderr, "make playsink\n");
     vo->playsink = gst_element_factory_make("playsink", "playsink");
     g_object_set(G_OBJECT(vo->playsink), "video-sink", vo->vsink, NULL);
 
+    fprintf(stderr, "video_output_setup_pipeline, make fdsrc\n");
     GstElement *source = gst_element_factory_make("fdsrc", "fdsrc");
     fprintf(stderr, "fdsrc: %d\n", vo->infile);
     g_object_set(G_OBJECT(source), "fd", vo->infile, NULL);
@@ -446,14 +472,19 @@ void video_output_setup_pipeline(VideoOutput *vo)
 /*    g_signal_connect(G_OBJECT(bus), "message",
             G_CALLBACK(video_output_gst_message), vo);*/
     g_object_unref(bus);
+
+    g_mutex_unlock(&vo->pipeline_mutex);
 }
 
 void video_output_clear_pipeline(VideoOutput *vo)
 {
+    fprintf(stderr, "video_output_clear_pipeline: %p\n", vo->pipeline);
+    g_mutex_lock(&vo->pipeline_mutex);
     if (vo->pipeline) {
         gst_element_set_state(vo->pipeline, GST_STATE_NULL);
         gst_object_unref(vo->pipeline);
     }
 
     vo->pipeline = NULL;
+    g_mutex_unlock(&vo->pipeline_mutex);
 }
