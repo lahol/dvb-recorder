@@ -8,6 +8,9 @@
 
 #include "video-output.h"
 #include <dvbrecorder/dvbrecorder.h>
+#include <dvbrecorder/channel-db.h>
+
+#include "ui-sidebar-dvb.h"
 
 #include "config.h"
 
@@ -50,6 +53,19 @@ gchar *main_get_snapshot_dir(void)
     }
     
     return dir;
+}
+
+void main_init_channel_db(void)
+{
+    gchar *db = g_build_filename(
+            g_get_user_config_dir(),
+            "dvb-recorder",
+            "channels.db",
+            NULL);
+
+    if (channel_db_init(db) != 0)
+        fprintf(stderr, "Failed to init channel db\n");
+    g_free(db);
 }
 
 static void main_quit(GtkWidget *widget, gpointer data)
@@ -137,10 +153,10 @@ static gboolean main_key_event(GtkWidget *widget, GdkEventKey *event, gpointer d
             if (event->type == GDK_KEY_RELEASE)
                 main_action_snapshot();
             break;
-        case GDK_KEY_t:
+/*        case GDK_KEY_t:
             if (event->type == GDK_KEY_RELEASE)
                 dvb_recorder_set_channel(appdata.recorder, 0);
-            break;
+            break;*/
         default:
             return FALSE;
     }
@@ -284,8 +300,10 @@ void main_init_toolbox(void)
     GtkWidget *menu_bar = main_create_main_menu();
     gtk_box_pack_start(GTK_BOX(content), menu_bar, FALSE, FALSE, 0);
 
-    GtkWidget *entry = gtk_entry_new();
-    gtk_box_pack_start(GTK_BOX(content), entry, TRUE, TRUE, 0);
+/*    GtkWidget *entry = gtk_entry_new();
+    gtk_box_pack_start(GTK_BOX(content), entry, TRUE, TRUE, 0);*/
+    GtkWidget *channel_list = ui_sidebar_channels_new(appdata.recorder);
+    gtk_box_pack_start(GTK_BOX(content), channel_list, TRUE, TRUE, 0);
 
     gtk_window_add_accel_group(GTK_WINDOW(widgets.toolbox), widgets.accelerator_group);
     
@@ -317,6 +335,8 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
             switch (((DVBRecorderEventStreamStatusChanged *)event)->status) {
                 case DVB_STREAM_STATUS_TUNED:
                     fprintf(stderr, "dvb-recorder: tuned in\n");
+                    video_output_set_infile(appdata.video_output,
+                            dvb_recorder_enable_video_source(appdata.recorder, TRUE));
                     break;
                 case DVB_STREAM_STATUS_TUNE_FAILED:
                     fprintf(stderr, "dvb-recorder: tune failed\n");
@@ -357,14 +377,16 @@ int main(int argc, char **argv)
         fprintf(stderr, "Failed to load config.\n");
     g_free(config);
 
+    main_init_channel_db();
+
     /* setup librecorder */
+    appdata.recorder = dvb_recorder_new(main_recorder_event_callback, NULL);
 
     main_init_window();
     main_init_toolbox();
     widgets.show_toolbox = 1;
     gtk_window_present(GTK_WINDOW(widgets.main_window));
     
-    appdata.recorder = dvb_recorder_new(main_recorder_event_callback, NULL);
 /*    if (!appdata.recorder)*/
         
     appdata.video_output = video_output_new(widgets.drawing_area);
@@ -373,7 +395,7 @@ int main(int argc, char **argv)
     fprintf(stderr, "recorder video source: %d\n", fd);
     video_output_set_infile(appdata.video_output, fd);
 
-    dvb_recorder_set_channel(appdata.recorder, 0);
+/*    dvb_recorder_set_channel(appdata.recorder, 0);*/
 
     gtk_main();
 
