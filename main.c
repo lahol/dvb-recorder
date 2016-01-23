@@ -19,6 +19,12 @@ struct {
     GtkWidget *drawing_area;
     GtkWidget *toolbox;
 
+    struct {
+        GtkWidget *record;
+        gulong record_toggled_signal;
+        GtkWidget *snapshot;
+    } buttons;
+
     GtkAccelGroup *accelerator_group;
 
     guint32 fullscreen : 1;
@@ -198,6 +204,11 @@ static void main_drawing_area_realize(GtkWidget *widget, gpointer data)
     fprintf(stderr, "drawing_area_realize\n");
 }
 
+void main_button_record_toggled(GtkToggleButton *button, gpointer data)
+{
+    main_action_record();
+}
+
 void main_menu_show_toolbar(gpointer userdata)
 {
     if (widgets.show_toolbox) {
@@ -301,6 +312,27 @@ void main_init_window(void)
     gtk_widget_show_all(widgets.main_window);
 }
 
+GtkWidget *main_init_toolbox_buttons(void)
+{
+    GtkWidget *hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 1);
+
+    widgets.buttons.record = gtk_toggle_button_new();
+    gtk_button_set_image(GTK_BUTTON(widgets.buttons.record),
+            gtk_image_new_from_icon_name("media-record", GTK_ICON_SIZE_LARGE_TOOLBAR));
+    /* FIXME: signal handler */
+    widgets.buttons.record_toggled_signal =
+        g_signal_connect(G_OBJECT(widgets.buttons.record), "toggled",
+            G_CALLBACK(main_button_record_toggled), NULL);
+    gtk_box_pack_start(GTK_BOX(hbox), widgets.buttons.record, FALSE, FALSE, 0);
+
+    widgets.buttons.snapshot = gtk_button_new();
+    gtk_button_set_image(GTK_BUTTON(widgets.buttons.snapshot),
+            gtk_image_new_from_icon_name("document-save", GTK_ICON_SIZE_LARGE_TOOLBAR));
+    gtk_box_pack_end(GTK_BOX(hbox), widgets.buttons.snapshot, FALSE, FALSE, 0);
+
+    return hbox;
+}
+
 void main_init_toolbox(void)
 {
     widgets.toolbox = gtk_dialog_new();
@@ -309,6 +341,9 @@ void main_init_toolbox(void)
 
     GtkWidget *menu_bar = main_create_main_menu();
     gtk_box_pack_start(GTK_BOX(content), menu_bar, FALSE, FALSE, 0);
+
+    GtkWidget *button_bar = main_init_toolbox_buttons();
+    gtk_box_pack_start(GTK_BOX(content), button_bar, FALSE, FALSE, 0);
 
 /*    GtkWidget *entry = gtk_entry_new();
     gtk_box_pack_start(GTK_BOX(content), entry, TRUE, TRUE, 0);*/
@@ -327,6 +362,18 @@ void main_recorder_channel_selected_cb(UiSidebarChannels *sidebar, guint channel
 {
     fprintf(stderr, "channel-selected: (%p, %u, %p)\n", sidebar, channel_id, userdata);
     dvb_recorder_set_channel(appdata.recorder, channel_id);
+
+    gtk_window_present(GTK_WINDOW(widgets.main_window));
+}
+
+void main_ui_update_button_status(void)
+{
+    DVBRecorderRecordStatus status;
+    dvb_recorder_query_record_status(appdata.recorder, &status);
+    g_signal_handler_block(widgets.buttons.record, widgets.buttons.record_toggled_signal);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widgets.buttons.record),
+            (gboolean)(status.status == DVB_RECORD_STATUS_RECORDING));
+    g_signal_handler_unblock(widgets.buttons.record, widgets.buttons.record_toggled_signal);
 }
 
 void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
@@ -348,6 +395,7 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
                     }
                     break;
             }
+            main_ui_update_button_status();
             break;
         case DVB_RECORDER_EVENT_STREAM_STATUS_CHANGED:
             fprintf(stderr, "stream status changed: %d\n", ((DVBRecorderEventStreamStatusChanged *)event)->status);
