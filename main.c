@@ -204,11 +204,6 @@ static void main_drawing_area_realize(GtkWidget *widget, gpointer data)
     fprintf(stderr, "drawing_area_realize\n");
 }
 
-void main_button_record_toggled(GtkToggleButton *button, gpointer data)
-{
-    main_action_record();
-}
-
 void main_menu_show_toolbar(gpointer userdata)
 {
     if (widgets.show_toolbox) {
@@ -321,13 +316,15 @@ GtkWidget *main_init_toolbox_buttons(void)
             gtk_image_new_from_icon_name("media-record", GTK_ICON_SIZE_LARGE_TOOLBAR));
     /* FIXME: signal handler */
     widgets.buttons.record_toggled_signal =
-        g_signal_connect(G_OBJECT(widgets.buttons.record), "toggled",
-            G_CALLBACK(main_button_record_toggled), NULL);
+        g_signal_connect_swapped(G_OBJECT(widgets.buttons.record), "toggled",
+            G_CALLBACK(main_action_record), NULL);
     gtk_box_pack_start(GTK_BOX(hbox), widgets.buttons.record, FALSE, FALSE, 0);
 
     widgets.buttons.snapshot = gtk_button_new();
     gtk_button_set_image(GTK_BUTTON(widgets.buttons.snapshot),
             gtk_image_new_from_icon_name("document-save", GTK_ICON_SIZE_LARGE_TOOLBAR));
+    g_signal_connect_swapped(G_OBJECT(widgets.buttons.snapshot), "clicked",
+            G_CALLBACK(main_action_snapshot), NULL);
     gtk_box_pack_end(GTK_BOX(hbox), widgets.buttons.snapshot, FALSE, FALSE, 0);
 
     return hbox;
