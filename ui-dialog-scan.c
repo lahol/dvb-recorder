@@ -2,6 +2,7 @@
 #include "config.h"
 #include <dvbrecorder/channels.h>
 #include <dvbrecorder/channel-db.h>
+#include <dvbrecorder/dvb-scanner.h>
 #include <stdio.h>
 #include <glib/gi18n.h>
 #include <glib/gprintf.h>
@@ -18,17 +19,9 @@ struct _UiDialogScanPrivate {
 
     GtkWidget *spinner;
 
-    GMutex scan_mutex;
-    const gchar *satellite;
-
-    GList *scanned_channels;
-    GList *scanned_satellites;
-
-    guint32 status_scanning : 1;
-
     guint32 channels_found;
 
-    GPid child_pid;
+    DVBScanner *scanner;
 };
 
 G_DEFINE_TYPE(UiDialogScan, ui_dialog_scan, GTK_TYPE_DIALOG);
@@ -41,43 +34,25 @@ enum {
 
 void ui_dialog_scan_set_parent(UiDialogScan *dialog, GtkWindow *parent);
 
-static void ui_dialog_scan_child_watch_cb(GPid pid, gint status, UiDialogScan *self)
+static void ui_dialog_scan_scan_started(UiDialogScan *dialog, DVBScanner *scanner)
 {
-    fprintf(stderr, "child exited with status %d\n", status);
-    if (GTK_IS_SPINNER(self->priv->spinner))
-        gtk_spinner_stop(GTK_SPINNER(self->priv->spinner));
-    g_spawn_close_pid(pid);
-    self->priv->child_pid = 0;
+    gtk_spinner_start(GTK_SPINNER(dialog->priv->spinner));
 }
 
-static gboolean ui_dialog_scan_watch_out_cb(GIOChannel *channel, GIOCondition cond, UiDialogScan *self)
+static void ui_dialog_scan_scan_finished(UiDialogScan *dialog, DVBScanner *scanner)
 {
-    gchar *string = NULL;
+    if (GTK_IS_SPINNER(dialog->priv->spinner))
+        gtk_spinner_stop(GTK_SPINNER(dialog->priv->spinner));
+}
+
+static void ui_dialog_scan_channel_found(UiDialogScan *dialog, ChannelData *channel, DVBScanner *scanner)
+{
     gchar *label_text = NULL;
-    gsize size;
 
-    if (cond == G_IO_HUP) {
-        g_io_channel_unref(channel);
-        fprintf(stderr, "got hup\n");
-        return FALSE;
-    }
+    label_text = g_strdup_printf("Found %d channels.\n", ++dialog->priv->channels_found);
+    gtk_label_set_text(GTK_LABEL(dialog->priv->status_label), label_text);
 
-    g_io_channel_read_line(channel, &string, &size, NULL, NULL);
-
-/*    fprintf(stderr, "read line: %s", string);*/
-
-    g_mutex_lock(&self->priv->scan_mutex);
-    ChannelData *data = channel_data_parse(string, self->priv->satellite);
-    if (data != NULL) {
-        self->priv->scanned_channels = g_list_prepend(self->priv->scanned_channels, data);
-        label_text = g_strdup_printf("Found %d channels.\n", ++self->priv->channels_found);
-        gtk_label_set_text(GTK_LABEL(self->priv->status_label), label_text);
-    }
-    g_mutex_unlock(&self->priv->scan_mutex);
-
-    g_free(string);
     g_free(label_text);
-    return TRUE;
 }
 
 static void ui_dialog_scan_start_scan(UiDialogScan *self)
@@ -91,73 +66,18 @@ static void ui_dialog_scan_start_scan(UiDialogScan *self)
     if (config_get("dvb", "scan-command", CFG_TYPE_STRING, &cmd_raw) != 0)
         return;
 
-    GRegex *cmd_regex = g_regex_new("\\${satellite}", G_REGEX_RAW, 0, NULL);
-    gchar *cmd = g_regex_replace_literal(cmd_regex, cmd_raw, -1, 0, id, 0, NULL);
-
-    fprintf(stderr, "Command: %s\n", cmd);
-
-    gint argc = 0;
-    gchar **argv = NULL;
-
-    if (!g_shell_parse_argv(cmd, &argc, &argv, NULL))
-        goto err;
-
-    self->priv->satellite = id;
-    self->priv->scanned_satellites = g_list_prepend(self->priv->scanned_satellites,
-                                                    g_strdup(id));
-
-    GIOChannel *out_ch;
-    gint out;
-    gboolean ret;
-
-    ret = g_spawn_async_with_pipes(NULL, argv, NULL,
-            G_SPAWN_DO_NOT_REAP_CHILD | G_SPAWN_SEARCH_PATH, NULL,
-            NULL, &self->priv->child_pid, NULL, &out, NULL, NULL);
-
-    if (!ret) {
-        gtk_label_set_text(GTK_LABEL(self->priv->status_label), "Could not spawn child process.");
-        goto err;
-    }
-
-    gtk_spinner_start(GTK_SPINNER(self->priv->spinner));
-
-    g_child_watch_add(self->priv->child_pid, (GChildWatchFunc)ui_dialog_scan_child_watch_cb, self);
-
-    out_ch = g_io_channel_unix_new(out);
-    g_io_add_watch(out_ch, G_IO_IN | G_IO_HUP, (GIOFunc)ui_dialog_scan_watch_out_cb, self);
-
-err:
-    g_strfreev(argv);
-    g_regex_unref(cmd_regex);
+    dvb_scanner_set_satellite(self->priv->scanner, id);
+    dvb_scanner_set_scan_command(self->priv->scanner, cmd_raw);
     g_free(cmd_raw);
-    g_free(cmd);
-}
 
-GList *ui_dialog_scan_get_scanned_satellites(UiDialogScan *dialog)
-{
-    g_return_val_if_fail(IS_UI_DIALOG_SCAN(dialog), NULL);
-
-    return dialog->priv->scanned_satellites;
-}
-
-GList *ui_dialog_scan_get_channel_results(UiDialogScan *dialog)
-{
-    g_return_val_if_fail(IS_UI_DIALOG_SCAN(dialog), NULL);
-
-    return dialog->priv->scanned_channels;
+    dvb_scanner_start(self->priv->scanner);
 }
 
 static void ui_dialog_scan_dispose(GObject *gobject)
 {
     UiDialogScan *self = UI_DIALOG_SCAN(gobject);
 
-    g_list_free_full(self->priv->scanned_channels,
-            (GDestroyNotify)channel_data_free);
-    self->priv->scanned_channels = NULL;
-
-    g_list_free_full(self->priv->scanned_satellites,
-            (GDestroyNotify)g_free);
-    self->priv->scanned_satellites = NULL;
+    g_clear_object(&self->priv->scanner);
 
     G_OBJECT_CLASS(ui_dialog_scan_parent_class)->dispose(gobject);
 }
@@ -264,7 +184,13 @@ static void ui_dialog_scan_init(UiDialogScan *self)
     self->priv = G_TYPE_INSTANCE_GET_PRIVATE(self,
             UI_DIALOG_SCAN_TYPE, UiDialogScanPrivate);
 
-    g_mutex_init(&self->priv->scan_mutex);
+    self->priv->scanner = dvb_scanner_new();
+    g_signal_connect_swapped(G_OBJECT(self->priv->scanner), "scan-started",
+            G_CALLBACK(ui_dialog_scan_scan_started), self);
+    g_signal_connect_swapped(G_OBJECT(self->priv->scanner), "scan-finished",
+            G_CALLBACK(ui_dialog_scan_scan_finished), self);
+    g_signal_connect_swapped(G_OBJECT(self->priv->scanner), "channel-found",
+            G_CALLBACK(ui_dialog_scan_channel_found), self);
 
     populate_widget(self);
 }
@@ -282,121 +208,17 @@ void ui_dialog_scan_set_parent(UiDialogScan *dialog, GtkWindow *parent)
     gtk_window_set_modal(GTK_WINDOW(dialog), TRUE);
 }
 
-static void _channel_copy_to_list(ChannelData *data, GList **list)
-{
-    if (list)
-        *list = g_list_prepend(*list, channel_data_dup(data));
-}
-
-static gboolean _ui_dialog_is_scanned_satellite(ChannelData *data, GList *scanned_satellites)
-{
-    if (data == NULL || scanned_satellites == NULL)
-        return FALSE;
-    if (data->signalsource == NULL || data->signalsource[0] == '\0')
-        return FALSE;
-
-    GList *tmp;
-    static const gchar *translations[] = {
-        "S19E2", "S19.2E",
-        "S23E5", "S23.E5",
-        "S13E0", "S13E",
-        "S28E2", "S28.2E",
-        NULL, NULL
-    };
-
-    guint i;
-    for (i = 0; translations[i] != NULL; i += 2)
-    {
-        if (g_strcmp0(data->signalsource, translations[i+1]) == 0) {
-           for (tmp = scanned_satellites; tmp != NULL; tmp = g_list_next(tmp)) {
-               if (g_strcmp0((gchar *)tmp->data, translations[i]) == 0)
-                   return TRUE;
-           }
-           break;
-        }
-    }
-
-    return FALSE;
-}
-
-static gint _ui_dialog_compare_channel_nid_sid(ChannelData *a, ChannelData *b)
-{
-    if (a->nid == b->nid && a->sid == b->sid)
-        return 0;
-    if (a->nid > b->nid)
-        return 1;
-    else if (a->nid < b->nid)
-        return -1;
-    if (a->sid > b->sid)
-        return 1;
-    else if (a->sid < b->sid)
-        return -1;
-    return 1;
-}
-
-void ui_dialog_scan_update_channels_db(UiDialogScan *dialog)
-{
-    GList *old_channels = NULL;
-    GList *scanned_satellites = ui_dialog_scan_get_scanned_satellites(dialog);
-    if (scanned_satellites == NULL)
-        return;
-    GList *scanned_channels = ui_dialog_scan_get_channel_results(dialog);
-    GList *tmp, *match;
-    GList *new_channels = NULL;
-
-    /* get all channels from db */
-    channel_db_foreach(0, (CHANNEL_DB_FOREACH_CALLBACK)_channel_copy_to_list, &old_channels);
-
-    /* if old channel comes from one of the scanned channels mark as dirty */
-    for (tmp = old_channels; tmp != NULL; tmp = g_list_next(tmp)) {
-        if (_ui_dialog_is_scanned_satellite((ChannelData *)tmp->data, scanned_satellites)) {
-            ((ChannelData *)tmp->data)->flags |= CHNL_FLAG_DIRTY;
-        }
-    }
-    /* for each scanned channel, look up in list if nid, sid match
-     *  if found: update data, mark clean
-     *  else: append to new_list */
-    for (tmp = scanned_channels; tmp != NULL; tmp = g_list_next(tmp)) {
-        match = g_list_find_custom(old_channels, tmp->data, (GCompareFunc)_ui_dialog_compare_channel_nid_sid);
-        if (match != NULL) {
-            channel_data_update_payload((ChannelData *)match->data, (ChannelData *)tmp->data);
-            ((ChannelData *)match->data)->flags &= ~CHNL_FLAG_DIRTY;
-        }
-        else {
-            new_channels = g_list_prepend(new_channels, channel_data_dup((ChannelData *)tmp->data));
-        }
-    }
-
-    /* write lists back to db */
-    channel_db_start_transaction();
-    for (tmp = old_channels; tmp != NULL; tmp = g_list_next(tmp)) {
-        channel_db_set_channel((ChannelData *)tmp->data);
-    }
-    for (tmp = new_channels; tmp != NULL; tmp = g_list_next(tmp)) {
-        channel_db_set_channel((ChannelData *)tmp->data);
-    }
-    channel_db_commit_transaction();
-
-    g_list_free_full(old_channels, (GDestroyNotify)channel_data_free);
-    g_list_free_full(new_channels, (GDestroyNotify)channel_data_free);
-}
-
 GtkResponseType ui_dialog_scan_show(GtkWidget *parent)
 {
     GtkWidget *dialog = ui_dialog_scan_new(GTK_WINDOW(parent));
 
     GtkResponseType result = gtk_dialog_run(GTK_DIALOG(dialog));
+    dvb_scanner_stop(UI_DIALOG_SCAN(dialog)->priv->scanner);
     if (result == GTK_RESPONSE_OK) {
-        ui_dialog_scan_update_channels_db(UI_DIALOG_SCAN(dialog));
-    }
-    else if (result == GTK_RESPONSE_CLOSE) {
-        if (UI_DIALOG_SCAN(dialog)->priv->child_pid > 0) {
-            kill(UI_DIALOG_SCAN(dialog)->priv->child_pid, SIGKILL);
-        }
+        dvb_scanner_update_channels_db(UI_DIALOG_SCAN(dialog)->priv->scanner);
     }
 
     gtk_widget_destroy(dialog);
 
     return result;
 }
-

@@ -31,6 +31,6 @@ GType ui_sidebar_channels_get_type(void) G_GNUC_CONST;
 
 GtkWidget *ui_sidebar_channels_new(void);
 
-void ui_sidebar_recorder_update_favourites(UiSidebarChannels *sidebar);
+void ui_sidebar_channels_update_favourites(UiSidebarChannels *sidebar);
 
 G_END_DECLS

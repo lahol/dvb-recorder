@@ -11,6 +11,7 @@
 #include <dvbrecorder/channel-db.h>
 
 #include "ui-sidebar-dvb.h"
+#include "favourites-dialog.h"
 
 #include "config.h"
 
@@ -18,6 +19,7 @@ struct {
     GtkWidget *main_window;
     GtkWidget *drawing_area;
     GtkWidget *toolbox;
+    GtkWidget *channel_list;
 
     struct {
         GtkWidget *record;
@@ -249,6 +251,13 @@ void main_menu_quit(gpointer userdata)
     gtk_main_quit();
 }
 
+void main_menu_show_favourites_dialog(void)
+{
+    favourites_dialog_show(widgets.toolbox,
+            (CHANNEL_FAVOURITES_DIALOG_UPDATE_NOTIFY)ui_sidebar_channels_update_favourites,
+            widgets.channel_list);
+}
+
 void _main_add_accelerator(GtkWidget *item, const gchar *accel_signal, GtkAccelGroup *accel_group,
         guint accel_key, GdkModifierType accel_mods, GtkAccelFlags accel_flags,
         GCallback accel_cb, gpointer accel_data)
@@ -270,6 +279,11 @@ GtkWidget *main_create_context_menu(void)
             G_CALLBACK(main_menu_show_toolbar), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(popup), item);
 
+    item = gtk_menu_item_new_with_label(_("Edit channel lists"));
+    g_signal_connect_swapped(G_OBJECT(item), "activate",
+            G_CALLBACK(main_menu_show_favourites_dialog), NULL);
+    gtk_menu_shell_append(GTK_MENU_SHELL(popup), item);
+
     item = gtk_separator_menu_item_new();
     gtk_menu_shell_append(GTK_MENU_SHELL(popup), item);
 
@@ -289,6 +303,14 @@ GtkWidget *main_create_main_menu(void)
     GtkWidget *menu = gtk_menu_new();
 
     GtkWidget *item;
+
+    item = gtk_menu_item_new_with_label(_("Edit channel lists"));
+    g_signal_connect_swapped(G_OBJECT(item), "activate",
+            G_CALLBACK(main_menu_show_favourites_dialog), NULL);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+
+    item = gtk_separator_menu_item_new();
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
 
     item = gtk_menu_item_new_with_label(_("Quit"));
     g_signal_connect_swapped(G_OBJECT(item), "activate",
@@ -377,11 +399,11 @@ void main_init_toolbox(void)
 
 /*    GtkWidget *entry = gtk_entry_new();
     gtk_box_pack_start(GTK_BOX(content), entry, TRUE, TRUE, 0);*/
-    GtkWidget *channel_list = ui_sidebar_channels_new();
-    g_signal_connect(G_OBJECT(channel_list), "channel-selected",
+    widgets.channel_list = ui_sidebar_channels_new();
+    g_signal_connect(G_OBJECT(widgets.channel_list), "channel-selected",
             G_CALLBACK(main_recorder_channel_selected_cb), NULL);
-    gtk_widget_set_size_request(channel_list, 200, 400);
-    gtk_box_pack_start(GTK_BOX(content), channel_list, TRUE, TRUE, 0);
+    gtk_widget_set_size_request(widgets.channel_list, 200, 400);
+    gtk_box_pack_start(GTK_BOX(content), widgets.channel_list, TRUE, TRUE, 0);
 
     gtk_window_add_accel_group(GTK_WINDOW(widgets.toolbox), widgets.accelerator_group);
     
