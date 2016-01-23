@@ -10,7 +10,7 @@ ifdef GSTREAMER010
 	LIBS   += `$(PKG_CONFIG) --libs gstreamer-0.10 gstreamer-interfaces-0.10 gstreamer-base-0.10`
 else
 	CFLAGS += `$(PKG_CONFIG) --cflags gstreamer-1.0 gstreamer-plugins-base-1.0 gstreamer-base-1.0`
-	LIBS   += `$(PKG_CONFIG) --libs gstreamer-1.0 gstreamer-plugins-base-1.0 gstreamer-base-1.0` -lgstvideo-1.0
+	LIBS   += `$(PKG_CONFIG) --libs gstreamer-1.0 gstreamer-plugins-base-1.0 gstreamer-base-1.0` -lgstvideo-1.0 -lgstaudio-1.0
 endif
 
 RCVERSION := '$(shell git describe --tags --always) ($(shell git log --pretty=format:%cd --date=short -n1), branch \"$(shell git describe --tags --always --all | sed s:heads/::)\")'

@@ -138,6 +138,11 @@ void main_action_record(void)
     }
 }
 
+void main_action_mute(void)
+{
+    video_output_toggle_mute(appdata.video_output);
+}
+
 static gboolean main_key_event(GtkWidget *widget, GdkEventKey *event, gpointer data)
 {
     fprintf(stderr, "key event\n");
@@ -153,6 +158,10 @@ static gboolean main_key_event(GtkWidget *widget, GdkEventKey *event, gpointer d
         case GDK_KEY_space:
             if (event->type == GDK_KEY_RELEASE)
                 main_action_snapshot();
+            break;
+        case GDK_KEY_m:
+            if (event->type == GDK_KEY_RELEASE)
+                main_action_mute();
             break;
 /*        case GDK_KEY_t:
             if (event->type == GDK_KEY_RELEASE)

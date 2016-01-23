@@ -10,3 +10,4 @@ void video_output_destroy(VideoOutput *vo);
 void video_output_set_infile(VideoOutput *vo, int fd);
 
 gboolean video_output_snapshot(VideoOutput *vo, const gchar *filename);
+gboolean video_output_toggle_mute(VideoOutput *vo);

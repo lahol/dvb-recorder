@@ -13,6 +13,7 @@
 #include <gst/interfaces/xoverlay.h>
 #endif
 #include <gst/base/gstbasesink.h>
+#include <gst/audio/streamvolume.h>
 #include <gdk/gdkx.h>
 
 #include "video-output.h"
@@ -239,6 +240,18 @@ error:
 
     return result;
 #endif
+}
+
+gboolean video_output_toggle_mute(VideoOutput *vo)
+{
+    g_return_val_if_fail(vo != NULL, FALSE);
+    g_return_val_if_fail(vo->playsink != NULL, FALSE);
+
+    gboolean mute_status = gst_stream_volume_get_mute(GST_STREAM_VOLUME(vo->playsink));
+
+    gst_stream_volume_set_mute(GST_STREAM_VOLUME(vo->playsink), !mute_status);
+
+    return !mute_status;
 }
 
 gpointer video_output_thread_proc(VideoOutput *vo)
