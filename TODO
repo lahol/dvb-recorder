@@ -1,0 +1,5 @@
+= TODO =
+ * save status on exit (ini-file): last watched channel, mute/volume settings, (window positions)
+ * display EIT
+ * format string for custom record output
+ * select tables for recording
