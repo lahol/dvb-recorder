@@ -2,7 +2,6 @@
 
 #include <glib-object.h>
 #include <gtk/gtk.h>
-#include <dvbrecorder/dvbrecorder.h>
 
 G_BEGIN_DECLS
 
@@ -30,10 +29,7 @@ struct _UiSidebarChannelsClass {
 
 GType ui_sidebar_channels_get_type(void) G_GNUC_CONST;
 
-GtkWidget *ui_sidebar_channels_new(DVBRecorder *recorder);
-
-void ui_sidebar_channels_set_recorder(UiSidebarChannels *sidebar, DVBRecorder *recorder);
-DVBRecorder *ui_sidebar_recorder_get_backend(UiSidebarChannels *sidebar);
+GtkWidget *ui_sidebar_channels_new(void);
 
 void ui_sidebar_recorder_update_favourites(UiSidebarChannels *sidebar);
 

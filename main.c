@@ -32,6 +32,7 @@ struct {
 } appdata;
 
 GtkWidget *main_create_context_menu(void);
+void main_recorder_channel_selected_cb(UiSidebarChannels *sidebar, guint channel_id, gpointer userdata);
 
 gchar *main_get_capture_dir(void)
 {
@@ -302,12 +303,21 @@ void main_init_toolbox(void)
 
 /*    GtkWidget *entry = gtk_entry_new();
     gtk_box_pack_start(GTK_BOX(content), entry, TRUE, TRUE, 0);*/
-    GtkWidget *channel_list = ui_sidebar_channels_new(appdata.recorder);
+    GtkWidget *channel_list = ui_sidebar_channels_new();
+    g_signal_connect(G_OBJECT(channel_list), "channel-selected",
+            G_CALLBACK(main_recorder_channel_selected_cb), NULL);
+    gtk_widget_set_size_request(channel_list, 200, 400);
     gtk_box_pack_start(GTK_BOX(content), channel_list, TRUE, TRUE, 0);
 
     gtk_window_add_accel_group(GTK_WINDOW(widgets.toolbox), widgets.accelerator_group);
     
     gtk_widget_show_all(widgets.toolbox);
+}
+
+void main_recorder_channel_selected_cb(UiSidebarChannels *sidebar, guint channel_id, gpointer userdata)
+{
+    fprintf(stderr, "channel-selected: (%p, %u, %p)\n", sidebar, channel_id, userdata);
+    dvb_recorder_set_channel(appdata.recorder, channel_id);
 }
 
 void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)

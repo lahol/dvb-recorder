@@ -3,8 +3,9 @@
 #include <glib/gi18n.h>
 
 #include "channel-list.h"
-#include <dvbrecorder/channel-db.h>
 #include "favourites-dialog.h"
+
+#include <dvbrecorder/channel-db.h>
 
 struct _UiSidebarChannelsPrivate {
     GtkWidget *favourites_list_widget;
@@ -12,17 +13,21 @@ struct _UiSidebarChannelsPrivate {
 
     GtkListStore *channel_list_store;
     GtkListStore *favourites_list_store;
-
-    DVBRecorder *recorder;
 };
 
 G_DEFINE_TYPE(UiSidebarChannels, ui_sidebar_channels, GTK_TYPE_BIN);
 
 enum {
     PROP_0,
-    PROP_RECORDER,
     N_PROPERTIES
 };
+
+enum {
+    SIGNAL_CHANNEL_SELECTED = 0,
+    N_SIGNALS
+};
+
+guint ui_sidebar_signals[N_SIGNALS];
 
 static void ui_sidebar_channels_dispose(GObject *gobject)
 {
@@ -40,9 +45,6 @@ static void ui_sidebar_channels_set_property(GObject *object, guint prop_id,
     UiSidebarChannels *self = UI_SIDEBAR_CHANNELS(object);
 
     switch (prop_id) {
-        case PROP_RECORDER:
-            ui_sidebar_channels_set_recorder(self, (DVBRecorder *)g_value_get_pointer(value));
-            break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, spec);
             break;
@@ -55,9 +57,6 @@ static void ui_sidebar_channels_get_property(GObject *object, guint prop_id,
     UiSidebarChannels *self = UI_SIDEBAR_CHANNELS(object);
 
     switch (prop_id) {
-        case PROP_RECORDER:
-            g_value_set_pointer(value, self->priv->recorder);
-            break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, spec);
             break;
@@ -73,12 +72,18 @@ static void ui_sidebar_channels_class_init(UiSidebarChannelsClass *klass)
     gobject_class->set_property = ui_sidebar_channels_set_property;
     gobject_class->get_property = ui_sidebar_channels_get_property;
 
-    g_object_class_install_property(gobject_class,
-            PROP_RECORDER,
-            g_param_spec_pointer("recorder",
-                "DVBRecorder recorder",
-                "The recorder in use",
-                G_PARAM_READWRITE));
+    ui_sidebar_signals[SIGNAL_CHANNEL_SELECTED] =
+        g_signal_new("channel-selected",
+                G_TYPE_FROM_CLASS(gobject_class),
+                G_SIGNAL_RUN_LAST,
+                0,
+                NULL,
+                NULL,
+                NULL,
+                G_TYPE_NONE,
+                1,
+                G_TYPE_UINT,
+                NULL);
 
     g_type_class_add_private(G_OBJECT_CLASS(klass), sizeof(UiSidebarChannelsPrivate));
 }
@@ -96,15 +101,15 @@ static void _ui_sidebar_channels_channel_row_activated(UiSidebarChannels *sideba
 
     guint32 selection_id;
 
-    DVBRecorder *recorder = sidebar->priv->recorder;
-
     gtk_tree_model_get(model, &iter, CHNL_ROW_ID, &selection_id, -1);
 
     /* get data from db */
 /*    ChannelData *chdata = channel_db_get_channel(selection_id);
     if (chdata) {
         fprintf(stderr, "found channel, tuning in\n");*/
-    dvb_recorder_set_channel(sidebar->priv->recorder, selection_id);
+
+    g_signal_emit(sidebar, ui_sidebar_signals[SIGNAL_CHANNEL_SELECTED], 0, selection_id);
+
 /*    }*/
 #if 0
     if (chdata) {
@@ -227,21 +232,9 @@ static void ui_sidebar_channels_init(UiSidebarChannels *self)
 
 }
 
-GtkWidget *ui_sidebar_channels_new(DVBRecorder *recorder)
+GtkWidget *ui_sidebar_channels_new(void)
 {
-    return g_object_new(UI_SIDEBAR_CHANNELS_TYPE, "recorder", recorder, NULL);
-}
-
-void ui_sidebar_channels_set_recorder(UiSidebarChannels *sidebar, DVBRecorder *recorder)
-{
-    g_return_if_fail(IS_UI_SIDEBAR_CHANNELS(sidebar));
-    sidebar->priv->recorder = recorder;
-}
-
-DVBRecorder *ui_sidebar_channels_get_recorder(UiSidebarChannels *sidebar)
-{
-    g_return_val_if_fail(IS_UI_SIDEBAR_CHANNELS(sidebar), NULL);
-    return sidebar->priv->recorder;
+    return g_object_new(UI_SIDEBAR_CHANNELS_TYPE, NULL);
 }
 
 void ui_sidebar_channels_update_favourites(UiSidebarChannels *sidebar)
