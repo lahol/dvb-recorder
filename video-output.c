@@ -37,7 +37,9 @@ struct _VideoOutput {
     GMutex pipeline_mutex;
     GMutex infile_mutex;
 
+    gdouble volume;
     uint32_t write_error : 1;
+    uint32_t is_muted : 1;
 };
 
 void video_output_setup_pipeline(VideoOutput *vo);
@@ -56,6 +58,8 @@ VideoOutput *video_output_new(GtkWidget *drawing_area)
     vo->infile = -1;
     vo->communication_pipe[0] = -1;
     vo->communication_pipe[1] = -1;
+
+    vo->volume = 1.0;
 
     g_mutex_init(&vo->pipeline_mutex);
     g_mutex_init(&vo->infile_mutex);
@@ -245,13 +249,45 @@ error:
 gboolean video_output_toggle_mute(VideoOutput *vo)
 {
     g_return_val_if_fail(vo != NULL, FALSE);
-    g_return_val_if_fail(vo->playsink != NULL, FALSE);
 
-    gboolean mute_status = gst_stream_volume_get_mute(GST_STREAM_VOLUME(vo->playsink));
+    vo->is_muted = !vo->is_muted;
 
-    gst_stream_volume_set_mute(GST_STREAM_VOLUME(vo->playsink), !mute_status);
+    if (vo->playsink)
+        gst_stream_volume_set_mute(GST_STREAM_VOLUME(vo->playsink), (gboolean)vo->is_muted);
 
-    return !mute_status;
+    return (gboolean)vo->is_muted;
+}
+
+gboolean video_output_get_mute(VideoOutput *vo)
+{
+    g_return_val_if_fail(vo != NULL, FALSE);
+
+    /* return last status, even if no pipeline is active */
+    return (gboolean)vo->is_muted;
+}
+
+void video_output_set_volume(VideoOutput *vo, gdouble volume)
+{
+    g_return_if_fail(vo != NULL);
+
+    if (volume < 0.0)
+        volume = 0.0;
+    if (volume > 1.0)
+        volume = 1.0;
+    vo->volume = volume;
+
+    if (vo->playsink)
+        gst_stream_volume_set_volume(GST_STREAM_VOLUME(vo->playsink),
+                                     GST_STREAM_VOLUME_FORMAT_LINEAR,
+                                     volume);
+}
+
+gdouble video_output_get_volume(VideoOutput *vo)
+{
+    g_return_val_if_fail(vo != NULL, 0.0);
+
+    /* see also: http://gstreamer.freedesktop.org/data/doc/gstreamer/head/gst-plugins-base-libs/html/gst-plugins-base-libs-gststreamvolume.html#gst-stream-volume-convert-volume */
+    return vo->volume;
 }
 
 gpointer video_output_thread_proc(VideoOutput *vo)
@@ -445,7 +481,11 @@ void video_output_setup_pipeline(VideoOutput *vo)
 
     fprintf(stderr, "make playsink\n");
     vo->playsink = gst_element_factory_make("playsink", "playsink");
-    g_object_set(G_OBJECT(vo->playsink), "video-sink", vo->vsink, NULL);
+    g_object_set(G_OBJECT(vo->playsink),
+            "video-sink", vo->vsink,
+            "volume", vo->volume,
+            "mute", vo->is_muted,
+            NULL);
 
     fprintf(stderr, "video_output_setup_pipeline, make fdsrc\n");
     GstElement *source = gst_element_factory_make("fdsrc", "fdsrc");
