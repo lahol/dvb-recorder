@@ -23,6 +23,9 @@ struct {
         GtkWidget *record;
         gulong record_toggled_signal;
         GtkWidget *snapshot;
+        GtkWidget *volume;
+        gulong volume_changed_signal;
+        GtkWidget *mute;
     } buttons;
 
     GtkAccelGroup *accelerator_group;
@@ -146,7 +149,31 @@ void main_action_record(void)
 
 void main_action_mute(void)
 {
-    video_output_toggle_mute(appdata.video_output);
+    gboolean muted = video_output_toggle_mute(appdata.video_output);
+
+    g_signal_handler_block(widgets.buttons.volume, widgets.buttons.volume_changed_signal);
+
+    if (muted)
+        gtk_scale_button_set_value(GTK_SCALE_BUTTON(widgets.buttons.volume), 0.0);
+    else
+        gtk_scale_button_set_value(GTK_SCALE_BUTTON(widgets.buttons.volume),
+                video_output_get_volume(appdata.video_output));
+
+    g_signal_handler_unblock(widgets.buttons.volume, widgets.buttons.volume_changed_signal);
+}
+
+void main_action_set_volume(gdouble volume)
+{
+    video_output_set_volume(appdata.video_output, volume);
+
+    g_signal_handler_block(widgets.buttons.volume, widgets.buttons.volume_changed_signal);
+    gtk_scale_button_set_value(GTK_SCALE_BUTTON(widgets.buttons.volume), volume);
+    g_signal_handler_unblock(widgets.buttons.volume, widgets.buttons.volume_changed_signal);
+}
+
+static void main_ui_volume_value_changed(GtkScaleButton *button, gdouble value, gpointer data)
+{
+    video_output_set_volume(appdata.video_output, value);
 }
 
 static gboolean main_key_event(GtkWidget *widget, GdkEventKey *event, gpointer data)
@@ -327,6 +354,12 @@ GtkWidget *main_init_toolbox_buttons(void)
             G_CALLBACK(main_action_snapshot), NULL);
     gtk_box_pack_end(GTK_BOX(hbox), widgets.buttons.snapshot, FALSE, FALSE, 0);
 
+    widgets.buttons.volume = gtk_volume_button_new();
+    widgets.buttons.volume_changed_signal =
+        g_signal_connect(G_OBJECT(widgets.buttons.volume), "value-changed",
+                G_CALLBACK(main_ui_volume_value_changed), NULL);
+    gtk_box_pack_end(GTK_BOX(hbox), widgets.buttons.volume, FALSE, FALSE, 0);
+
     return hbox;
 }
 
@@ -458,6 +491,8 @@ int main(int argc, char **argv)
     int fd = dvb_recorder_enable_video_source(appdata.recorder, TRUE);
     fprintf(stderr, "recorder video source: %d\n", fd);
     video_output_set_infile(appdata.video_output, fd);
+
+    main_action_set_volume(1.0);
 
 /*    dvb_recorder_set_channel(appdata.recorder, 0);*/
 
