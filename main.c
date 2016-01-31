@@ -9,6 +9,7 @@
 #include "video-output.h"
 #include <dvbrecorder/dvbrecorder.h>
 #include <dvbrecorder/channel-db.h>
+#include <dvbrecorder/epg.h>
 
 #include "ui-sidebar-dvb.h"
 #include "favourites-dialog.h"
@@ -428,6 +429,19 @@ void main_ui_update_button_status(void)
     g_signal_handler_unblock(widgets.buttons.record, widgets.buttons.record_toggled_signal);
 }
 
+void _dump_event(EPGEvent *event)
+{
+    size_t sz = sizeof(EPGEvent);
+    gchar *ptr = (gchar *)event;
+    gchar *end = ptr + sz;
+    fprintf(stderr, "[main] dump event %p [%zd]\n", event, sz);
+    while (ptr < end) {
+        fprintf(stderr, "%02x ", *ptr & 0xff);
+        ++ptr;
+    }
+    fprintf(stderr, "\n");
+}
+
 void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
 {
     switch (event->type) {
@@ -470,6 +484,30 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
                     break;
                 default:
                     break;
+            }
+            break;
+        case DVB_RECORDER_EVENT_EIT_CHANGED:
+            {
+                fprintf(stderr, "EIT changed\n");
+                GList *events = dvb_recorder_get_epg(appdata.recorder);
+
+                GList *tmp, *tmp_desc;
+                for (tmp = events; tmp; tmp = g_list_next(tmp)) {
+/*                    _dump_event((EPGEvent *)tmp->data);*/
+                    fprintf(stderr, "Event id: 0x%02x\n", ((EPGEvent *)tmp->data)->event_id);
+                    fprintf(stderr, "short_desc: %p, ext_desc: %p\n", ((EPGEvent *)tmp->data)->short_descriptions,
+                            ((EPGEvent *)tmp->data)->extended_descriptions);
+                    for (tmp_desc = ((EPGEvent *)tmp->data)->short_descriptions; tmp_desc; tmp_desc = g_list_next(tmp_desc)) {
+                        fprintf(stderr, "[ShortDesc] %s\n[ShortText]%s\n", ((EPGShortEvent *)tmp_desc->data)->description,
+                                ((EPGShortEvent *)tmp_desc->data)->text);
+                    }
+                    for (tmp_desc = ((EPGEvent *)tmp->data)->extended_descriptions;
+                         tmp_desc;
+                         tmp_desc = g_list_next(tmp_desc)) {
+                        fprintf(stderr, "[ExtText]  %s\n", ((EPGExtendedEvent *)tmp_desc->data)->text);
+                    }
+                }
+                g_list_free(events);
             }
             break;
         default:
