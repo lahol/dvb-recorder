@@ -3,3 +3,8 @@
  * display EIT
  * format string for custom record output
  * select tables for recording
+ * hide mouse cursor in fullscreen mode
+ * BUG: channel switching (requires two activations)
+ * (custom) sort channel list
+ * adapt window size to content
+ * restore focus after unfullscreen
