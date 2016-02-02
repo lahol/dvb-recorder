@@ -15,12 +15,15 @@
 #include "favourites-dialog.h"
 
 #include "config.h"
+#include "ui-epg-list.h"
 
 struct {
     GtkWidget *main_window;
     GtkWidget *drawing_area;
     GtkWidget *toolbox;
     GtkWidget *channel_list;
+    GtkWidget *epg_dialog;
+    GtkWidget *epg_list;
 
     struct {
         GtkWidget *record;
@@ -35,6 +38,7 @@ struct {
 
     guint32 fullscreen : 1;
     guint32 show_toolbox : 1;
+    guint32 show_epg : 1;
 } widgets;
 
 struct {
@@ -411,6 +415,19 @@ void main_init_toolbox(void)
     gtk_widget_show_all(widgets.toolbox);
 }
 
+void main_init_epg_dialog(void)
+{
+    widgets.epg_dialog = gtk_dialog_new();
+    gtk_window_set_transient_for(GTK_WINDOW(widgets.epg_dialog), GTK_WINDOW(widgets.main_window));
+    GtkWidget *content = gtk_dialog_get_content_area(GTK_DIALOG(widgets.epg_dialog));
+
+    widgets.epg_list = ui_epg_list_new();
+    gtk_widget_set_size_request(widgets.epg_list, 400, 200);
+    gtk_box_pack_start(GTK_BOX(content), widgets.epg_list, TRUE, TRUE, 0);
+
+    gtk_widget_show_all(widgets.epg_dialog);
+}
+
 void main_recorder_channel_selected_cb(UiSidebarChannels *sidebar, guint channel_id, gpointer userdata)
 {
     fprintf(stderr, "channel-selected: (%p, %u, %p)\n", sidebar, channel_id, userdata);
@@ -490,7 +507,8 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
             {
                 fprintf(stderr, "EIT changed\n");
                 GList *events = dvb_recorder_get_epg(appdata.recorder);
-
+                ui_epg_list_update_events(UI_EPG_LIST(widgets.epg_list), events); 
+#if 0
                 GList *tmp, *tmp_desc;
                 for (tmp = events; tmp; tmp = g_list_next(tmp)) {
 /*                    _dump_event((EPGEvent *)tmp->data);*/
@@ -507,6 +525,7 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
                         fprintf(stderr, "[ExtText]  %s\n", ((EPGExtendedEvent *)tmp_desc->data)->text);
                     }
                 }
+#endif
                 g_list_free(events);
             }
             break;
@@ -541,7 +560,9 @@ int main(int argc, char **argv)
 
     main_init_window();
     main_init_toolbox();
+    main_init_epg_dialog();
     widgets.show_toolbox = 1;
+    widgets.show_epg = 1;
     gtk_window_present(GTK_WINDOW(widgets.main_window));
     
 /*    if (!appdata.recorder)*/
