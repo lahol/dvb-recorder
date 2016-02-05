@@ -23,7 +23,9 @@ enum {
 
 static void epg_event_widget_dispose(GObject *gobject)
 {
-    /*EpgEventWidget *self = EPG_EVENT_WIDGET(gobject);*/
+    EpgEventWidget *self = EPG_EVENT_WIDGET(gobject);
+    epg_event_free(self->priv->event);
+    self->priv->event = NULL;
 
     G_OBJECT_CLASS(epg_event_widget_parent_class)->dispose(gobject);
 }

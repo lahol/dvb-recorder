@@ -508,6 +508,7 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
                 fprintf(stderr, "EIT changed\n");
                 GList *events = dvb_recorder_get_epg(appdata.recorder);
                 ui_epg_list_update_events(UI_EPG_LIST(widgets.epg_list), events); 
+                fprintf(stderr, "Updated events\n");
 #if 0
                 GList *tmp, *tmp_desc;
                 for (tmp = events; tmp; tmp = g_list_next(tmp)) {
