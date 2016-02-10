@@ -507,9 +507,10 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
             {
                 fprintf(stderr, "EIT changed\n");
                 GList *events = dvb_recorder_get_epg(appdata.recorder);
+#if 1
                 ui_epg_list_update_events(UI_EPG_LIST(widgets.epg_list), events); 
                 fprintf(stderr, "Updated events\n");
-#if 0
+#else
                 GList *tmp, *tmp_desc;
                 for (tmp = events; tmp; tmp = g_list_next(tmp)) {
 /*                    _dump_event((EPGEvent *)tmp->data);*/
@@ -517,7 +518,7 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
                     fprintf(stderr, "short_desc: %p, ext_desc: %p\n", ((EPGEvent *)tmp->data)->short_descriptions,
                             ((EPGEvent *)tmp->data)->extended_descriptions);
                     for (tmp_desc = ((EPGEvent *)tmp->data)->short_descriptions; tmp_desc; tmp_desc = g_list_next(tmp_desc)) {
-                        fprintf(stderr, "[ShortDesc] %s\n[ShortText]%s\n", ((EPGShortEvent *)tmp_desc->data)->description,
+                        fprintf(stderr, "[ShortDesc] %s\n[ShortText] %s\n", ((EPGShortEvent *)tmp_desc->data)->description,
                                 ((EPGShortEvent *)tmp_desc->data)->text);
                     }
                     for (tmp_desc = ((EPGEvent *)tmp->data)->extended_descriptions;

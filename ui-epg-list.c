@@ -171,11 +171,13 @@ void ui_epg_list_update_events(UiEpgList *list, GList *events)
     GtkWidget *child;
     for ( ; events; events = g_list_next(events)) {
         child = gtk_list_box_row_new();
+/*        fprintf(stderr, "event->data: %p\n", events->data);*/
+        fprintf(stderr, "add event %s\n", ((EPGShortEvent *)(((EPGEvent *)events->data)->short_descriptions->data))->description);
         gtk_container_add(GTK_CONTAINER(child), epg_event_widget_new((EPGEvent *)events->data));
         gtk_list_box_row_set_activatable(GTK_LIST_BOX_ROW(child), FALSE);
         gtk_list_box_row_set_selectable(GTK_LIST_BOX_ROW(child), FALSE);
         gtk_container_add(GTK_CONTAINER(list->priv->events_list), child);
-        gtk_widget_show(child);
+        gtk_widget_show_all(child);
 
         list->priv->children = g_list_prepend(list->priv->children, child);
     }

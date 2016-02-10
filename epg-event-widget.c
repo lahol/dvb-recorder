@@ -122,16 +122,18 @@ static void populate_widget(EpgEventWidget *self)
     GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
 
     self->priv->short_desc = gtk_label_new("Short Description");
+    gtk_widget_set_halign(self->priv->short_desc, GTK_ALIGN_START);
     gtk_box_pack_start(GTK_BOX(vbox), self->priv->short_desc, FALSE, FALSE, 2);
 
     self->priv->extended_desc = gtk_label_new("Some longer description");
+    gtk_widget_set_halign(self->priv->extended_desc, GTK_ALIGN_START);
     gtk_box_pack_start(GTK_BOX(vbox), self->priv->extended_desc, FALSE, FALSE, 2);
 
     gtk_container_add(GTK_CONTAINER(self->priv->expander), vbox);
 
     gtk_container_add(GTK_CONTAINER(self), self->priv->expander);
 
-/*    epg_event_widget_update_event(self);*/
+    epg_event_widget_update_event(self);
 }
 
 static void epg_event_widget_init(EpgEventWidget *self)
@@ -153,12 +155,11 @@ void epg_event_widget_set_event(EpgEventWidget *widget, EPGEvent *event)
 {
     g_return_if_fail(IS_EPG_EVENT_WIDGET(widget));
 
-    if (widget->priv->event == event)
-        return;
-    epg_event_free(widget->priv->event);
+    if (widget->priv->event != event)
+        epg_event_free(widget->priv->event);
     widget->priv->event = epg_event_dup(event);
 
-/*    epg_event_widget_update_event(widget);*/
+    epg_event_widget_update_event(widget);
 }
 
 EPGEvent *epg_event_widget_get_event(EpgEventWidget *widget)
