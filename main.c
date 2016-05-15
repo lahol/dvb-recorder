@@ -506,28 +506,12 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
         case DVB_RECORDER_EVENT_EIT_CHANGED:
             {
                 fprintf(stderr, "EIT changed\n");
+
                 GList *events = dvb_recorder_get_epg(appdata.recorder);
-#if 1
                 ui_epg_list_update_events(UI_EPG_LIST(widgets.epg_list), events); 
+
                 fprintf(stderr, "Updated events\n");
-#else
-                GList *tmp, *tmp_desc;
-                for (tmp = events; tmp; tmp = g_list_next(tmp)) {
-/*                    _dump_event((EPGEvent *)tmp->data);*/
-                    fprintf(stderr, "Event id: 0x%02x\n", ((EPGEvent *)tmp->data)->event_id);
-                    fprintf(stderr, "short_desc: %p, ext_desc: %p\n", ((EPGEvent *)tmp->data)->short_descriptions,
-                            ((EPGEvent *)tmp->data)->extended_descriptions);
-                    for (tmp_desc = ((EPGEvent *)tmp->data)->short_descriptions; tmp_desc; tmp_desc = g_list_next(tmp_desc)) {
-                        fprintf(stderr, "[ShortDesc] %s\n[ShortText] %s\n", ((EPGShortEvent *)tmp_desc->data)->description,
-                                ((EPGShortEvent *)tmp_desc->data)->text);
-                    }
-                    for (tmp_desc = ((EPGEvent *)tmp->data)->extended_descriptions;
-                         tmp_desc;
-                         tmp_desc = g_list_next(tmp_desc)) {
-                        fprintf(stderr, "[ExtText]  %s\n", ((EPGExtendedEvent *)tmp_desc->data)->text);
-                    }
-                }
-#endif
+
                 g_list_free(events);
             }
             break;

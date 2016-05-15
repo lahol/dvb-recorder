@@ -24,6 +24,8 @@ enum {
     EPG_ROW_DURATION,
     EPG_ROW_SHORT,
     EPG_ROW_EXTENDED,
+    EPG_ROW_STARTTIME_STRING,
+    EPG_ROW_DURATION_STRING,
     EPG_N_ROWS
 };
 
@@ -96,15 +98,66 @@ static gint ui_epg_list_box_sort_func(GtkListBoxRow *row1, GtkListBoxRow *row2, 
     return 1;
 }
 
+static void ui_epg_list_row_activated(UiEpgList *self, GtkTreePath *path, GtkTreeViewColumn *column, GtkTreeView *tv)
+{
+    g_return_if_fail(IS_UI_EPG_LIST(self));
+
+    GtkTreeIter iter;
+    GtkTreeModel *model = gtk_tree_view_get_model(tv);
+    if (model == NULL || !gtk_tree_model_get_iter(model, &iter, path))
+        return;
+
+    guint16 event_id;
+
+    gtk_tree_model_get(model, &iter, EPG_ROW_ID, &event_id, -1);
+
+    fprintf(stderr, "Show information for event %u\n", event_id);
+}
+
 static void populate_widget(UiEpgList *self)
 {
     GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
 
+#if 0
     self->priv->events_list = gtk_list_box_new();
     gtk_list_box_set_sort_func(GTK_LIST_BOX(self->priv->events_list),
                                (GtkListBoxSortFunc)ui_epg_list_box_sort_func,
                                NULL,
                                NULL);
+#else
+    self->priv->events_list = gtk_tree_view_new();
+
+    GtkCellRenderer *renderer;
+    GtkTreeViewColumn *column;
+    GtkListStore *store;
+
+    renderer = gtk_cell_renderer_text_new();
+    column = gtk_tree_view_column_new_with_attributes(_("Start time"),
+            renderer, "text", EPG_ROW_STARTTIME_STRING, NULL);
+    gtk_tree_view_append_column(GTK_TREE_VIEW(self->priv->events_list), column);
+
+    renderer = gtk_cell_renderer_text_new();
+    column = gtk_tree_view_column_new_with_attributes(_("Short Description"),
+            renderer, "text", EPG_ROW_TITLE, NULL);
+    gtk_tree_view_append_column(GTK_TREE_VIEW(self->priv->events_list), column);
+
+    store = gtk_list_store_new(EPG_N_ROWS,
+                               G_TYPE_UINT,     /* id */
+                               G_TYPE_STRING,   /* title */
+                               G_TYPE_UINT64,   /* starttime */
+                               G_TYPE_UINT,     /* duration */
+                               G_TYPE_POINTER,  /* reserved: short desc */
+                               G_TYPE_POINTER,  /* reserved: extendet desc */
+                               G_TYPE_STRING,   /* starttime as string; alternatively as cell_data_func */
+                               G_TYPE_STRING);  /* duration as string */
+
+    gtk_tree_view_set_model(GTK_TREE_VIEW(self->priv->events_list), GTK_TREE_MODEL(store));
+    g_object_unref(store);
+
+    g_signal_connect_swapped(G_OBJECT(self->priv->events_list), "row-activated",
+            G_CALLBACK(ui_epg_list_row_activated), self);
+
+#endif
 
     GtkWidget *scroll = gtk_scrolled_window_new(NULL, NULL);
     gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
@@ -161,25 +214,121 @@ GtkWidget *ui_epg_list_new(void)
 
 void ui_epg_list_clear_children(UiEpgList *self)
 {
+#if 0 
     g_list_free_full(self->priv->children, (GDestroyNotify)gtk_widget_destroy);
     self->priv->children = NULL;
+#endif
+}
+
+struct _ui_epg_list_update_data {
+    UiEpgList *list;
+    GList *events;
+};
+
+void _starttime_to_string(gchar *buffer, gsize buflen, time_t starttime)
+{
+    struct tm *tm = localtime(&starttime);
+
+    strftime(buffer, buflen, "%a, %d.%m. %R", tm);
+}
+
+void _duration_to_string(gchar *buffer, gsize buflen, guint32 seconds)
+{
+/*    guint32 d, h, m, s, t;
+    d = seconds / (24*3600);
+    t = seconds % (24*3600);
+    h = t / 3600;
+    t = t % 3600;
+    m = t / 60;
+    s = t % 60;*/
+
+    snprintf(buffer, buflen, "%us", seconds);
+}
+
+/* present/following event may be there twice: once in 0x4e and another time in 0x50..0x5f;
+ * assume that the list is already sorted by time, i.e., the corresponding events must be
+ * next to each other */
+GList *_epg_list_remove_duplicates(GList *list)
+{
+    GList *tmp = list, *next;
+
+    while (tmp) {
+        next = tmp->next;
+
+        if (tmp->prev) {
+            if (((EPGEvent *)tmp->prev->data)->event_id == ((EPGEvent *)tmp->data)->event_id) {
+                /* duplicate detected (event_id is unique in service definition) */
+                /* drop this event */
+                epg_event_free((EPGEvent *)tmp->data);
+                list = g_list_delete_link(list, tmp);
+            }
+        }
+
+        tmp = next;
+    }
+
+    return list;
+}
+
+static gboolean _ui_epg_list_update_events_idle(struct _ui_epg_list_update_data *data)
+{
+#if 1
+    GtkListStore *store = GTK_LIST_STORE(gtk_tree_view_get_model(GTK_TREE_VIEW(data->list->priv->events_list)));
+    GtkTreeIter iter;
+    EPGEvent *ev;
+    EPGShortEvent *sev;
+    gchar starttime_str[256];
+    gchar duration_str[256];
+
+    gtk_list_store_clear(GTK_LIST_STORE(store));
+
+    data->events = _epg_list_remove_duplicates(data->events);
+
+    for ( ; data->events; data->events = g_list_next(data->events)) {
+        ev = (EPGEvent *)data->events->data;
+        /* list head */
+        sev = (EPGShortEvent *)(ev->short_descriptions ? ev->short_descriptions->data : NULL);
+        _starttime_to_string(starttime_str, 256, ev->starttime);
+        _duration_to_string(duration_str, 256, ev->duration);
+        gtk_list_store_append(store, &iter);
+        gtk_list_store_set(store, &iter,
+                EPG_ROW_TITLE, sev ? sev->description : "<i>no description</i>",
+                EPG_ROW_ID, ev->event_id,
+                EPG_ROW_STARTTIME, ev->starttime,
+                EPG_ROW_DURATION, ev->duration,
+                EPG_ROW_STARTTIME_STRING, starttime_str,
+                EPG_ROW_DURATION_STRING, duration_str,
+                -1);
+    }
+#else
+    ui_epg_list_clear_children(data->list);
+    GtkWidget *child;
+    for ( ; data->events; data->events = g_list_next(data->events)) {
+        child = gtk_list_box_row_new();
+/*        fprintf(stderr, "event->data: %p\n", events->data);*/
+        fprintf(stderr, "add event %s\n", ((EPGShortEvent *)(((EPGEvent *)data->events->data)->short_descriptions->data))->description);
+        gtk_container_add(GTK_CONTAINER(child), epg_event_widget_new((EPGEvent *)data->events->data));
+        gtk_list_box_row_set_activatable(GTK_LIST_BOX_ROW(child), FALSE);
+        gtk_list_box_row_set_selectable(GTK_LIST_BOX_ROW(child), FALSE);
+        gtk_container_add(GTK_CONTAINER(data->list->priv->events_list), child);
+        gtk_widget_show_all(child);
+
+        data->list->priv->children = g_list_prepend(data->list->priv->children, child);
+    }
+#endif
+    /* FIXME: clear events data (or keep until next update?) */
+    g_list_free_full(data->events, (GDestroyNotify)epg_event_free);
+    g_free(data);
+
+    return FALSE;
 }
 
 void ui_epg_list_update_events(UiEpgList *list, GList *events)
 {
-    ui_epg_list_clear_children(list);
-    GtkWidget *child;
-    for ( ; events; events = g_list_next(events)) {
-        child = gtk_list_box_row_new();
-/*        fprintf(stderr, "event->data: %p\n", events->data);*/
-        fprintf(stderr, "add event %s\n", ((EPGShortEvent *)(((EPGEvent *)events->data)->short_descriptions->data))->description);
-        gtk_container_add(GTK_CONTAINER(child), epg_event_widget_new((EPGEvent *)events->data));
-        gtk_list_box_row_set_activatable(GTK_LIST_BOX_ROW(child), FALSE);
-        gtk_list_box_row_set_selectable(GTK_LIST_BOX_ROW(child), FALSE);
-        gtk_container_add(GTK_CONTAINER(list->priv->events_list), child);
-        gtk_widget_show_all(child);
+    struct _ui_epg_list_update_data *data = g_malloc(sizeof(struct _ui_epg_list_update_data));
+    data->list = list;
+    data->events = epg_event_list_dup(events);
 
-        list->priv->children = g_list_prepend(list->priv->children, child);
-    }
+    gdk_threads_add_idle((GSourceFunc)_ui_epg_list_update_events_idle, data);
 }
 
