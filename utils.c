@@ -80,7 +80,6 @@ gchar *util_translate_control_codes_to_markup(gchar *string)
     gssize length = 0;
 
     while (string[j]) {
-        fprintf(stderr, "%02x ", string[j] & 0xff);
         if ((guchar)string[j] == 0xc2) {
             if ((guchar)string[j+1] == 0x86)
                 delta += 1;         /* c286 -> <i> */
@@ -99,7 +98,6 @@ gchar *util_translate_control_codes_to_markup(gchar *string)
     j = 0;
     while (j <= length) {
         if ((guchar)string[j] == 0xc2) {
-            fprintf(stderr, "control sequence at position %zd\n", j);
             if ((guchar)string[j+1] == 0x86) {
                 out[k] = '<';
                 out[k+1] = 'i';
@@ -121,7 +119,6 @@ gchar *util_translate_control_codes_to_markup(gchar *string)
                 j += 2;
             }
             else {
-                fprintf(stderr, "but no match: 0x%02x\n", string[j] & 0xff);
                 out[k] = string[j];
                 ++k;
                 ++j;
@@ -133,9 +130,6 @@ gchar *util_translate_control_codes_to_markup(gchar *string)
             ++j;
         }
     }
-
-    fprintf(stderr, "\nin: %s\n", string);
-    fprintf(stderr, "out: %s\n", out);
 
     return out;
 }
