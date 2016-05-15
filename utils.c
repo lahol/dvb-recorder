@@ -1,6 +1,7 @@
 #include "utils.h"
 #include <png.h>
 #include <gst/gst.h>
+#include <stdio.h>
 
 gboolean util_write_data_to_png(const gchar *filename, guint8 *buffer, guint width, guint height, guint bpp)
 {
@@ -64,4 +65,77 @@ done:
     return result;
 }
 
+/* in utf8-string with control codes : 0xc286, 0xc287, 0xc28a -> <i>, </i>, \n
+ * control codes may be in the range 0xc280 to 0xc29f
+ * returns newly allocated string */
+gchar *util_translate_control_codes_to_markup(gchar *string)
+{
+    if (!string)
+        return NULL;
+    gchar *out = NULL;
 
+    gssize j = 0;
+    gssize k;
+    gssize delta = 0;
+    gssize length = 0;
+
+    while (string[j]) {
+        fprintf(stderr, "%02x ", string[j] & 0xff);
+        if ((guchar)string[j] == 0xc2) {
+            if ((guchar)string[j+1] == 0x86)
+                delta += 1;         /* c286 -> <i> */
+            else if ((guchar)string[j+1] == 0x87)
+                delta += 2;         /* c287 -> </i> */
+            else if ((guchar)string[j+1] == 0x8a)
+                delta -= 1;         /* c28a -> \n */
+        }
+        ++j;
+    }
+
+    length = j;
+
+    out = g_malloc(sizeof(gchar)*(length + delta + 1));
+    k = 0;
+    j = 0;
+    while (j <= length) {
+        if ((guchar)string[j] == 0xc2) {
+            fprintf(stderr, "control sequence at position %zd\n", j);
+            if ((guchar)string[j+1] == 0x86) {
+                out[k] = '<';
+                out[k+1] = 'i';
+                out[k+2] = '>';
+                k += 3;
+                j += 2;
+            }
+            else if ((guchar)string[j+1] == 0x87) {
+                out[k] = '<';
+                out[k+1] = '/';
+                out[k+2] = 'i';
+                out[k+3] = '>';
+                k += 4;
+                j += 2;
+            }
+            else if ((guchar)string[j+1] == 0x8a) {
+                out[k] = '\n';
+                ++k;
+                j += 2;
+            }
+            else {
+                fprintf(stderr, "but no match: 0x%02x\n", string[j] & 0xff);
+                out[k] = string[j];
+                ++k;
+                ++j;
+            }
+        }
+        else {
+            out[k] = string[j];
+            ++k;
+            ++j;
+        }
+    }
+
+    fprintf(stderr, "\nin: %s\n", string);
+    fprintf(stderr, "out: %s\n", out);
+
+    return out;
+}

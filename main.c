@@ -547,6 +547,7 @@ int main(int argc, char **argv)
     main_init_window();
     main_init_toolbox();
     main_init_epg_dialog();
+    ui_epg_list_set_recorder_handle(UI_EPG_LIST(widgets.epg_list), appdata.recorder);
     widgets.show_toolbox = 1;
     widgets.show_epg = 1;
     gtk_window_present(GTK_WINDOW(widgets.main_window));

@@ -1,13 +1,18 @@
 #include "ui-epg-list.h"
 #include <glib/gi18n.h>
 #include <glib/gprintf.h>
-#include "epg-event-widget.h"
+#include "ui-epg-event-detail.h"
 
 struct _UiEpgListPrivate {
     /* private data */
     GtkWidget *events_list;
 
-    GList *children;
+    GtkWidget *stack;
+    GtkWidget *overview_page;
+    GtkWidget *details_page;
+    GtkWidget *details_widget;
+
+    DVBRecorder *recorder;
 };
 
 G_DEFINE_TYPE(UiEpgList, ui_epg_list, GTK_TYPE_BIN);
@@ -49,8 +54,8 @@ static void ui_epg_list_set_property(GObject *object, guint prop_id,
     UiEpgList *self = UI_EPG_LIST(object);
 
     switch (prop_id) {
-        /* case PROP_*:
-		break;*/
+       /* case PROP_RECORDER:
+    	break;*/
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, spec);
             break;
@@ -112,19 +117,24 @@ static void ui_epg_list_row_activated(UiEpgList *self, GtkTreePath *path, GtkTre
     gtk_tree_model_get(model, &iter, EPG_ROW_ID, &event_id, -1);
 
     fprintf(stderr, "Show information for event %u\n", event_id);
+
+    EPGEvent *event = epg_event_dup(dvb_recorder_get_epg_event(self->priv->recorder, event_id));
+    ui_epg_event_detail_set_event(UI_EPG_EVENT_DETAIL(self->priv->details_widget), event);
+
+    gtk_stack_set_visible_child(GTK_STACK(self->priv->stack), self->priv->details_page);
+}
+
+static void ui_epg_list_details_button_back_clicked(UiEpgList *self)
+{
+    g_return_if_fail(IS_UI_EPG_LIST(self));
+
+    gtk_stack_set_visible_child(GTK_STACK(self->priv->stack), self->priv->overview_page);
 }
 
 static void populate_widget(UiEpgList *self)
 {
     GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
 
-#if 0
-    self->priv->events_list = gtk_list_box_new();
-    gtk_list_box_set_sort_func(GTK_LIST_BOX(self->priv->events_list),
-                               (GtkListBoxSortFunc)ui_epg_list_box_sort_func,
-                               NULL,
-                               NULL);
-#else
     self->priv->events_list = gtk_tree_view_new();
 
     GtkCellRenderer *renderer;
@@ -157,8 +167,6 @@ static void populate_widget(UiEpgList *self)
     g_signal_connect_swapped(G_OBJECT(self->priv->events_list), "row-activated",
             G_CALLBACK(ui_epg_list_row_activated), self);
 
-#endif
-
     GtkWidget *scroll = gtk_scrolled_window_new(NULL, NULL);
     gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
             GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
@@ -167,34 +175,30 @@ static void populate_widget(UiEpgList *self)
 
     gtk_box_pack_start(GTK_BOX(vbox), scroll, TRUE, TRUE, 0);
 
-/*    GtkWidget *box;
-    box = gtk_list_box_row_new();
-    gtk_container_add(GTK_CONTAINER(box), epg_event_widget_new());
-    gtk_list_box_row_set_activatable(GTK_LIST_BOX_ROW(box), FALSE);
-    gtk_list_box_row_set_selectable(GTK_LIST_BOX_ROW(box), FALSE);
-    gtk_container_add(GTK_CONTAINER(self->priv->events_list), box);
+    self->priv->stack = gtk_stack_new();
+    fprintf(stderr, "transition type: %d\n", gtk_stack_get_transition_type(GTK_STACK(self->priv->stack)));
+    gtk_stack_set_transition_type(GTK_STACK(self->priv->stack), GTK_STACK_TRANSITION_TYPE_SLIDE_LEFT_RIGHT);
+    self->priv->overview_page = vbox;
 
-    box = gtk_list_box_row_new();
-    gtk_container_add(GTK_CONTAINER(box), epg_event_widget_new());
-    gtk_list_box_row_set_activatable(GTK_LIST_BOX_ROW(box), FALSE);
-    gtk_list_box_row_set_selectable(GTK_LIST_BOX_ROW(box), FALSE);
-    gtk_container_add(GTK_CONTAINER(self->priv->events_list), box);
+    gtk_container_add(GTK_CONTAINER(self->priv->stack), self->priv->overview_page);
 
-    box = gtk_list_box_row_new();
-    gtk_container_add(GTK_CONTAINER(box), epg_event_widget_new());
-    gtk_list_box_row_set_activatable(GTK_LIST_BOX_ROW(box), FALSE);
-    gtk_list_box_row_set_selectable(GTK_LIST_BOX_ROW(box), FALSE);
-    gtk_container_add(GTK_CONTAINER(self->priv->events_list), box);
+    vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
 
-    box = gtk_list_box_row_new();
-    gtk_container_add(GTK_CONTAINER(box), epg_event_widget_new());
-    gtk_list_box_row_set_activatable(GTK_LIST_BOX_ROW(box), FALSE);
-    gtk_list_box_row_set_selectable(GTK_LIST_BOX_ROW(box), FALSE);
-    gtk_container_add(GTK_CONTAINER(self->priv->events_list), box);
-*/
+    GtkWidget *button = gtk_button_new_with_label(_("Back"));
+    g_signal_connect_swapped(G_OBJECT(button), "clicked",
+            G_CALLBACK(ui_epg_list_details_button_back_clicked), self);
+    gtk_box_pack_start(GTK_BOX(vbox), button, FALSE, FALSE, 0);
 
-    gtk_container_add(GTK_CONTAINER(self), vbox);
-    gtk_widget_show_all(vbox);
+    self->priv->details_widget = ui_epg_event_detail_new();
+    gtk_box_pack_start(GTK_BOX(vbox), self->priv->details_widget, TRUE, TRUE, 0);
+
+    self->priv->details_page = vbox;
+    gtk_container_add(GTK_CONTAINER(self->priv->stack), self->priv->details_page);
+
+    gtk_stack_set_visible_child(GTK_STACK(self->priv->stack), self->priv->overview_page);
+
+    gtk_container_add(GTK_CONTAINER(self), self->priv->stack);
+    gtk_widget_show_all(self->priv->stack);
 }
 
 static void ui_epg_list_init(UiEpgList *self)
@@ -210,14 +214,6 @@ static void ui_epg_list_init(UiEpgList *self)
 GtkWidget *ui_epg_list_new(void)
 {
     return g_object_new(UI_EPG_LIST_TYPE, NULL);
-}
-
-void ui_epg_list_clear_children(UiEpgList *self)
-{
-#if 0 
-    g_list_free_full(self->priv->children, (GDestroyNotify)gtk_widget_destroy);
-    self->priv->children = NULL;
-#endif
 }
 
 struct _ui_epg_list_update_data {
@@ -272,7 +268,6 @@ GList *_epg_list_remove_duplicates(GList *list)
 
 static gboolean _ui_epg_list_update_events_idle(struct _ui_epg_list_update_data *data)
 {
-#if 1
     GtkListStore *store = GTK_LIST_STORE(gtk_tree_view_get_model(GTK_TREE_VIEW(data->list->priv->events_list)));
     GtkTreeIter iter;
     EPGEvent *ev;
@@ -300,22 +295,7 @@ static gboolean _ui_epg_list_update_events_idle(struct _ui_epg_list_update_data 
                 EPG_ROW_DURATION_STRING, duration_str,
                 -1);
     }
-#else
-    ui_epg_list_clear_children(data->list);
-    GtkWidget *child;
-    for ( ; data->events; data->events = g_list_next(data->events)) {
-        child = gtk_list_box_row_new();
-/*        fprintf(stderr, "event->data: %p\n", events->data);*/
-        fprintf(stderr, "add event %s\n", ((EPGShortEvent *)(((EPGEvent *)data->events->data)->short_descriptions->data))->description);
-        gtk_container_add(GTK_CONTAINER(child), epg_event_widget_new((EPGEvent *)data->events->data));
-        gtk_list_box_row_set_activatable(GTK_LIST_BOX_ROW(child), FALSE);
-        gtk_list_box_row_set_selectable(GTK_LIST_BOX_ROW(child), FALSE);
-        gtk_container_add(GTK_CONTAINER(data->list->priv->events_list), child);
-        gtk_widget_show_all(child);
 
-        data->list->priv->children = g_list_prepend(data->list->priv->children, child);
-    }
-#endif
     /* FIXME: clear events data (or keep until next update?) */
     g_list_free_full(data->events, (GDestroyNotify)epg_event_free);
     g_free(data);
@@ -330,5 +310,12 @@ void ui_epg_list_update_events(UiEpgList *list, GList *events)
     data->events = epg_event_list_dup(events);
 
     gdk_threads_add_idle((GSourceFunc)_ui_epg_list_update_events_idle, data);
+}
+
+void ui_epg_list_set_recorder_handle(UiEpgList *list, DVBRecorder *handle)
+{
+    g_return_if_fail(IS_UI_EPG_LIST(list));
+
+    list->priv->recorder = handle;
 }
 

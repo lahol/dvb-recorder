@@ -2,6 +2,7 @@
 
 #include <glib-object.h>
 #include <gtk/gtk.h>
+#include <dvbrecorder/dvbrecorder.h>
 
 G_BEGIN_DECLS
 
@@ -32,5 +33,6 @@ GType ui_epg_list_get_type(void) G_GNUC_CONST;
 GtkWidget *ui_epg_list_new(void);
 
 void ui_epg_list_update_events(UiEpgList *list, GList *events);
+void ui_epg_list_set_recorder_handle(UiEpgList *list, DVBRecorder *handle);
 
 G_END_DECLS
