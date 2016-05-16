@@ -133,3 +133,52 @@ gchar *util_translate_control_codes_to_markup(gchar *string)
 
     return out;
 }
+
+void util_time_to_string(gchar *buffer, gsize buflen, time_t starttime, gboolean short_format)
+{
+    struct tm *tm = localtime(&starttime);
+
+    if (short_format)
+        strftime(buffer, buflen, "%a, %d.%m. %R", tm);
+    else
+        strftime(buffer, buflen, "%a, %x %R", tm);
+}
+
+void util_duration_to_string(gchar *buffer, gsize buflen, guint32 seconds)
+{
+    guint32 d, h, m, s, t;
+    d = seconds / (24*3600);
+    t = seconds % (24*3600);
+    h = t / 3600;
+    t = t % 3600;
+    m = t / 60;
+    s = t % 60;
+
+    if (d == 0) {
+        if (h == 0) {
+            if (s == 0)
+                snprintf(buffer, buflen, "%um", m);
+            else
+                snprintf(buffer, buflen, "%um %02us", m, s);
+        }
+        else {
+            if (s == 0)
+                snprintf(buffer, buflen, "%uh %02um", h, m);
+            else
+                snprintf(buffer, buflen, "%uh %02um %02us", h, m, s);
+        }
+    }
+    else {
+        if (s == 0) {
+            if (m == 0)
+                snprintf(buffer, buflen, "%ud %02uh", d, h);
+            else
+                snprintf(buffer, buflen, "%ud %02uh %02um", d, h, m);
+        }
+        else {
+            snprintf(buffer, buflen, "%ud %02uh %02um %02us", d, h, m, s);
+        }
+    }
+}
+
+

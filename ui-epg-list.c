@@ -119,6 +119,36 @@ static void ui_epg_list_row_activated(UiEpgList *self, GtkTreePath *path, GtkTre
     fprintf(stderr, "Show information for event %u\n", event_id);
 
     EPGEvent *event = epg_event_dup(dvb_recorder_get_epg_event(self->priv->recorder, event_id));
+
+    /* BEGIN DEBUG */
+    if (event->event_id == 33344) {
+        GList *ext_events = NULL;
+        EPGExtendedEventItem *item;
+
+        item = g_malloc(sizeof(EPGExtendedEventItem));
+        item->description = g_strdup("Beschreibung");
+        item->content = g_strdup("Inhalt");
+        ext_events = g_list_prepend(ext_events, item);
+
+        item = g_malloc(sizeof(EPGExtendedEventItem));
+        item->description = g_strdup("Regisseur");
+        item->content = g_strdup("Son Typ");
+        ext_events = g_list_prepend(ext_events, item);
+
+        item = g_malloc(sizeof(EPGExtendedEventItem));
+        item->description = g_strdup("Maske");
+        item->content = g_strdup("Blubb");
+        ext_events = g_list_prepend(ext_events, item);
+
+        item = g_malloc(sizeof(EPGExtendedEventItem));
+        item->description = g_strdup("Drehbuch");
+        item->content = g_strdup("noch einer");
+        ext_events = g_list_prepend(ext_events, item);
+
+        ((EPGExtendedEvent *)(event->extended_descriptions->data))->description_items = ext_events;
+    }
+    /* END DEBUG */
+
     ui_epg_event_detail_set_event(UI_EPG_EVENT_DETAIL(self->priv->details_widget), event);
 
     gtk_stack_set_visible_child(GTK_STACK(self->priv->stack), self->priv->details_page);
@@ -221,26 +251,6 @@ struct _ui_epg_list_update_data {
     GList *events;
 };
 
-void _starttime_to_string(gchar *buffer, gsize buflen, time_t starttime)
-{
-    struct tm *tm = localtime(&starttime);
-
-    strftime(buffer, buflen, "%a, %d.%m. %R", tm);
-}
-
-void _duration_to_string(gchar *buffer, gsize buflen, guint32 seconds)
-{
-/*    guint32 d, h, m, s, t;
-    d = seconds / (24*3600);
-    t = seconds % (24*3600);
-    h = t / 3600;
-    t = t % 3600;
-    m = t / 60;
-    s = t % 60;*/
-
-    snprintf(buffer, buflen, "%us", seconds);
-}
-
 /* present/following event may be there twice: once in 0x4e and another time in 0x50..0x5f;
  * assume that the list is already sorted by time, i.e., the corresponding events must be
  * next to each other */
@@ -283,8 +293,8 @@ static gboolean _ui_epg_list_update_events_idle(struct _ui_epg_list_update_data 
         ev = (EPGEvent *)data->events->data;
         /* list head */
         sev = (EPGShortEvent *)(ev->short_descriptions ? ev->short_descriptions->data : NULL);
-        _starttime_to_string(starttime_str, 256, ev->starttime);
-        _duration_to_string(duration_str, 256, ev->duration);
+        util_time_to_string(starttime_str, 256, ev->starttime, TRUE);
+        util_duration_to_string(duration_str, 256, ev->duration);
         gtk_list_store_append(store, &iter);
         gtk_list_store_set(store, &iter,
                 EPG_ROW_TITLE, sev ? sev->description : "<i>no description</i>",

@@ -246,14 +246,21 @@ error:
 #endif
 }
 
+void video_output_set_mute(VideoOutput *vo, gboolean mute)
+{
+    g_return_if_fail(vo != NULL);
+
+    vo->is_muted = mute;
+
+    if (vo->playsink)
+        gst_stream_volume_set_mute(GST_STREAM_VOLUME(vo->playsink), (gboolean)vo->is_muted);
+}
+
 gboolean video_output_toggle_mute(VideoOutput *vo)
 {
     g_return_val_if_fail(vo != NULL, FALSE);
 
-    vo->is_muted = !vo->is_muted;
-
-    if (vo->playsink)
-        gst_stream_volume_set_mute(GST_STREAM_VOLUME(vo->playsink), (gboolean)vo->is_muted);
+    video_output_set_mute(vo, !vo->is_muted);
 
     return (gboolean)vo->is_muted;
 }

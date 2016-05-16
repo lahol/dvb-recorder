@@ -15,12 +15,13 @@
 #include "favourites-dialog.h"
 
 #include "config.h"
+#include "status.h"
 #include "ui-epg-list.h"
 
 struct {
     GtkWidget *main_window;
     GtkWidget *drawing_area;
-    GtkWidget *toolbox;
+    GtkWidget *channels_dialog;
     GtkWidget *channel_list;
     GtkWidget *epg_dialog;
     GtkWidget *epg_list;
@@ -35,10 +36,6 @@ struct {
     } buttons;
 
     GtkAccelGroup *accelerator_group;
-
-    guint32 fullscreen : 1;
-    guint32 show_toolbox : 1;
-    guint32 show_epg : 1;
 } widgets;
 
 struct {
@@ -47,8 +44,78 @@ struct {
     guint32 is_recording : 1;
 } appdata;
 
+AppStatus appstatus;
+
 GtkWidget *main_create_context_menu(void);
 void main_recorder_channel_selected_cb(UiSidebarChannels *sidebar, guint channel_id, gpointer userdata);
+
+void main_window_status_set_visible(GtkWidget *window, GuiWindowStatus *status, gboolean is_visible)
+{
+    /* hide/show window, do not touch show_window */
+    /* FIXME: only set visibility if the user does not want to hide this window */
+    if (is_visible) {
+        gtk_window_present(GTK_WINDOW(window));
+        if (status->initialized) {
+            gtk_window_set_default_size(GTK_WINDOW(window), status->width, status->height);
+            gtk_window_move(GTK_WINDOW(window), status->x, status->y);
+        }
+        status->is_visible = 1;
+    }
+    else {
+        gtk_widget_hide(window);
+        status->is_visible = 0;
+    }
+}
+
+void main_window_status_set_show(GtkWidget *window, GuiWindowStatus *status, gboolean do_show)
+{
+    /* set show/hide, keep track of show_window */
+    if (do_show) {
+        status->show_window = 1;
+    }
+    else {
+        status->show_window = 0;
+    }
+
+    main_window_status_set_visible(window, status, do_show);
+}
+
+void main_window_status_toggle_show(GtkWidget *window, GuiWindowStatus *status)
+{
+    main_window_status_set_show(window, status, !status->show_window);
+}
+
+void main_window_status_set_fullscreen(gboolean fullscreen)
+{
+    if (fullscreen) {
+        main_window_status_set_visible(widgets.channels_dialog, &appstatus.gui.channels_dialog, FALSE);
+        main_window_status_set_visible(widgets.epg_dialog, &appstatus.gui.epg_dialog, FALSE);
+        gtk_window_fullscreen(GTK_WINDOW(widgets.main_window));
+        appstatus.gui.main_window.fullscreen = 1;
+    }
+    else {
+        main_window_status_set_visible(widgets.channels_dialog, &appstatus.gui.channels_dialog, TRUE);
+        main_window_status_set_visible(widgets.epg_dialog, &appstatus.gui.epg_dialog, TRUE);
+        gtk_window_unfullscreen(GTK_WINDOW(widgets.main_window));
+        appstatus.gui.main_window.fullscreen = 0;
+    }
+}
+
+gboolean main_window_status_configure_event(GtkWidget *window, GdkEventConfigure *event, GuiWindowStatus *win_status)
+{
+    win_status->x = event->x;
+    win_status->y = event->y;
+    win_status->width = event->width;
+    win_status->height = event->height;
+
+    if (!win_status->initialized) {
+        win_status->show_window = 1;
+        win_status->is_visible = 1;
+        win_status->initialized = 1;
+    }
+
+    return FALSE;
+}
 
 gchar *main_get_capture_dir(void)
 {
@@ -92,16 +159,7 @@ static void main_quit(GtkWidget *widget, gpointer data)
 
 void main_toggle_fullscreen(void)
 {
-    if (!widgets.fullscreen) {
-        widgets.fullscreen = TRUE;
-        gtk_widget_hide(widgets.toolbox);
-        gtk_window_fullscreen(GTK_WINDOW(widgets.main_window));
-    }
-    else {
-        widgets.fullscreen = FALSE;
-        gtk_widget_show(widgets.toolbox);
-        gtk_window_unfullscreen(GTK_WINDOW(widgets.main_window));
-    }
+    main_window_status_set_fullscreen(!appstatus.gui.main_window.fullscreen);
 }
 
 void main_action_snapshot(void)
@@ -154,13 +212,14 @@ void main_action_record(void)
     }
 }
 
-void main_action_mute(void)
+void main_action_set_mute(gboolean mute)
 {
-    gboolean muted = video_output_toggle_mute(appdata.video_output);
+    appstatus.recorder.mute = mute;
+    video_output_set_mute(appdata.video_output, mute);
 
     g_signal_handler_block(widgets.buttons.volume, widgets.buttons.volume_changed_signal);
 
-    if (muted)
+    if (mute)
         gtk_scale_button_set_value(GTK_SCALE_BUTTON(widgets.buttons.volume), 0.0);
     else
         gtk_scale_button_set_value(GTK_SCALE_BUTTON(widgets.buttons.volume),
@@ -169,9 +228,17 @@ void main_action_mute(void)
     g_signal_handler_unblock(widgets.buttons.volume, widgets.buttons.volume_changed_signal);
 }
 
+void main_action_toggle_mute(void)
+{
+    gboolean muted = video_output_get_mute(appdata.video_output);
+
+    main_action_set_mute(!muted);
+}
+
 void main_action_set_volume(gdouble volume)
 {
     video_output_set_volume(appdata.video_output, volume);
+    appstatus.recorder.volume = volume;
 
     g_signal_handler_block(widgets.buttons.volume, widgets.buttons.volume_changed_signal);
     gtk_scale_button_set_value(GTK_SCALE_BUTTON(widgets.buttons.volume), volume);
@@ -181,6 +248,7 @@ void main_action_set_volume(gdouble volume)
 static void main_ui_volume_value_changed(GtkScaleButton *button, gdouble value, gpointer data)
 {
     video_output_set_volume(appdata.video_output, value);
+    appstatus.recorder.volume = value;
 }
 
 static gboolean main_key_event(GtkWidget *widget, GdkEventKey *event, gpointer data)
@@ -201,7 +269,7 @@ static gboolean main_key_event(GtkWidget *widget, GdkEventKey *event, gpointer d
             break;
         case GDK_KEY_m:
             if (event->type == GDK_KEY_RELEASE)
-                main_action_mute();
+                main_action_toggle_mute();
             break;
 /*        case GDK_KEY_t:
             if (event->type == GDK_KEY_RELEASE)
@@ -238,16 +306,14 @@ static void main_drawing_area_realize(GtkWidget *widget, gpointer data)
     fprintf(stderr, "drawing_area_realize\n");
 }
 
-void main_menu_show_toolbar(gpointer userdata)
+void main_menu_show_channels_dialog(gpointer userdata)
 {
-    if (widgets.show_toolbox) {
-        gtk_widget_hide(widgets.toolbox);
-    }
-    else {
-        gtk_widget_show(widgets.toolbox);
-    }
+    main_window_status_toggle_show(widgets.channels_dialog, &appstatus.gui.channels_dialog);
+}
 
-    widgets.show_toolbox = !widgets.show_toolbox;
+void main_menu_show_epg_dialog(gpointer userdata)
+{
+    main_window_status_toggle_show(widgets.epg_dialog, &appstatus.gui.epg_dialog);
 }
 
 void main_menu_quit(gpointer userdata)
@@ -258,7 +324,7 @@ void main_menu_quit(gpointer userdata)
 
 void main_menu_show_favourites_dialog(void)
 {
-    favourites_dialog_show(widgets.toolbox,
+    favourites_dialog_show(widgets.channels_dialog,
             (CHANNEL_FAVOURITES_DIALOG_UPDATE_NOTIFY)ui_sidebar_channels_update_favourites,
             widgets.channel_list);
 }
@@ -279,9 +345,14 @@ GtkWidget *main_create_context_menu(void)
     GtkWidget *item;
 
     /* FIXME: check menu item */
-    item = gtk_menu_item_new_with_label(_("Show toolbox"));
+    item = gtk_menu_item_new_with_label(_("Show channels"));
     g_signal_connect_swapped(G_OBJECT(item), "activate",
-            G_CALLBACK(main_menu_show_toolbar), NULL);
+            G_CALLBACK(main_menu_show_channels_dialog), NULL);
+    gtk_menu_shell_append(GTK_MENU_SHELL(popup), item);
+
+    item = gtk_menu_item_new_with_label(_("Show EPG"));
+    g_signal_connect_swapped(G_OBJECT(item), "activate",
+            G_CALLBACK(main_menu_show_epg_dialog), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(popup), item);
 
     item = gtk_menu_item_new_with_label(_("Edit channel lists"));
@@ -343,11 +414,12 @@ void main_init_window(void)
             G_CALLBACK(main_key_event), NULL);
     g_signal_connect(G_OBJECT(widgets.main_window), "button-press-event",
             G_CALLBACK(main_button_event), NULL);
+    g_signal_connect(G_OBJECT(widgets.main_window), "configure-event",
+            G_CALLBACK(main_window_status_configure_event), &appstatus.gui.main_window);
 
     widgets.drawing_area = gtk_drawing_area_new();
     gtk_widget_add_events(widgets.drawing_area, GDK_KEY_PRESS_MASK | GDK_KEY_RELEASE_MASK);
 
-    gtk_widget_set_size_request(widgets.drawing_area, 320, 240);
     g_signal_connect(G_OBJECT(widgets.drawing_area), "size-allocate",
             G_CALLBACK(main_drawing_area_size_allocate), NULL);
     g_signal_connect(G_OBJECT(widgets.drawing_area), "realize",
@@ -358,10 +430,20 @@ void main_init_window(void)
     widgets.accelerator_group = gtk_accel_group_new();
     gtk_window_add_accel_group(GTK_WINDOW(widgets.main_window), widgets.accelerator_group);
 
+    if (appstatus.gui.main_window.initialized) {
+        gtk_window_move(GTK_WINDOW(widgets.main_window),
+                appstatus.gui.main_window.x, appstatus.gui.main_window.y);
+        gtk_window_set_default_size(GTK_WINDOW(widgets.main_window),
+                appstatus.gui.main_window.width, appstatus.gui.main_window.height);
+    }
+    else {
+        gtk_window_set_default_size(GTK_WINDOW(widgets.main_window), 320, 240);
+    }
+
     gtk_widget_show_all(widgets.main_window);
 }
 
-GtkWidget *main_init_toolbox_buttons(void)
+GtkWidget *main_init_channels_dialog_buttons(void)
 {
     GtkWidget *hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 1);
 
@@ -390,16 +472,18 @@ GtkWidget *main_init_toolbox_buttons(void)
     return hbox;
 }
 
-void main_init_toolbox(void)
+void main_init_channels_dialog(void)
 {
-    widgets.toolbox = gtk_dialog_new();
-    gtk_window_set_transient_for(GTK_WINDOW(widgets.toolbox), GTK_WINDOW(widgets.main_window));
-    GtkWidget *content = gtk_dialog_get_content_area(GTK_DIALOG(widgets.toolbox));
+    widgets.channels_dialog = gtk_dialog_new();
+    g_signal_connect(G_OBJECT(widgets.channels_dialog), "configure-event",
+            G_CALLBACK(main_window_status_configure_event), &appstatus.gui.channels_dialog);
+    gtk_window_set_transient_for(GTK_WINDOW(widgets.channels_dialog), GTK_WINDOW(widgets.main_window));
+    GtkWidget *content = gtk_dialog_get_content_area(GTK_DIALOG(widgets.channels_dialog));
 
     GtkWidget *menu_bar = main_create_main_menu();
     gtk_box_pack_start(GTK_BOX(content), menu_bar, FALSE, FALSE, 0);
 
-    GtkWidget *button_bar = main_init_toolbox_buttons();
+    GtkWidget *button_bar = main_init_channels_dialog_buttons();
     gtk_box_pack_start(GTK_BOX(content), button_bar, FALSE, FALSE, 0);
 
 /*    GtkWidget *entry = gtk_entry_new();
@@ -407,23 +491,45 @@ void main_init_toolbox(void)
     widgets.channel_list = ui_sidebar_channels_new();
     g_signal_connect(G_OBJECT(widgets.channel_list), "channel-selected",
             G_CALLBACK(main_recorder_channel_selected_cb), NULL);
-    gtk_widget_set_size_request(widgets.channel_list, 200, 400);
+
+
     gtk_box_pack_start(GTK_BOX(content), widgets.channel_list, TRUE, TRUE, 0);
 
-    gtk_window_add_accel_group(GTK_WINDOW(widgets.toolbox), widgets.accelerator_group);
+    gtk_window_add_accel_group(GTK_WINDOW(widgets.channels_dialog), widgets.accelerator_group);
+
+    if (appstatus.gui.channels_dialog.initialized) {
+        gtk_window_move(GTK_WINDOW(widgets.channels_dialog),
+                appstatus.gui.channels_dialog.x, appstatus.gui.channels_dialog.y);
+        gtk_window_set_default_size(GTK_WINDOW(widgets.channels_dialog),
+                appstatus.gui.channels_dialog.width, appstatus.gui.channels_dialog.height);
+    }
+    else {
+        gtk_window_set_default_size(GTK_WINDOW(widgets.channels_dialog), 200, 400);
+    }
     
-    gtk_widget_show_all(widgets.toolbox);
+    gtk_widget_show_all(widgets.channels_dialog);
 }
 
 void main_init_epg_dialog(void)
 {
     widgets.epg_dialog = gtk_dialog_new();
+    g_signal_connect(G_OBJECT(widgets.epg_dialog), "configure-event",
+            G_CALLBACK(main_window_status_configure_event), &appstatus.gui.epg_dialog);
     gtk_window_set_transient_for(GTK_WINDOW(widgets.epg_dialog), GTK_WINDOW(widgets.main_window));
     GtkWidget *content = gtk_dialog_get_content_area(GTK_DIALOG(widgets.epg_dialog));
 
     widgets.epg_list = ui_epg_list_new();
-    gtk_widget_set_size_request(widgets.epg_list, 400, 200);
+    
     gtk_box_pack_start(GTK_BOX(content), widgets.epg_list, TRUE, TRUE, 0);
+
+    if (appstatus.gui.epg_dialog.initialized) {
+        gtk_window_move(GTK_WINDOW(widgets.epg_dialog),
+                appstatus.gui.epg_dialog.x, appstatus.gui.epg_dialog.y);
+        gtk_window_set_default_size(GTK_WINDOW(widgets.epg_dialog),
+                appstatus.gui.epg_dialog.width, appstatus.gui.epg_dialog.height);
+    }
+    else
+        gtk_window_set_default_size(GTK_WINDOW(widgets.epg_dialog), 400, 300);
 
     gtk_widget_show_all(widgets.epg_dialog);
 }
@@ -432,6 +538,9 @@ void main_recorder_channel_selected_cb(UiSidebarChannels *sidebar, guint channel
 {
     fprintf(stderr, "channel-selected: (%p, %u, %p)\n", sidebar, channel_id, userdata);
     dvb_recorder_set_channel(appdata.recorder, channel_id);
+
+    appstatus.recorder.channel_id = channel_id;
+    appstatus.recorder.running = 1;
 
     gtk_window_present(GTK_WINDOW(widgets.main_window));
 }
@@ -539,17 +648,23 @@ int main(int argc, char **argv)
         fprintf(stderr, "Failed to load config.\n");
     g_free(config);
 
+    gchar *status_file = g_build_filename(
+            g_get_user_config_dir(),
+            "dvb-recorder",
+            "status",
+            NULL);
+    status_restore(&appstatus, status_file);
+
     main_init_channel_db();
 
     /* setup librecorder */
     appdata.recorder = dvb_recorder_new(main_recorder_event_callback, NULL);
 
     main_init_window();
-    main_init_toolbox();
+    main_init_channels_dialog();
     main_init_epg_dialog();
     ui_epg_list_set_recorder_handle(UI_EPG_LIST(widgets.epg_list), appdata.recorder);
-    widgets.show_toolbox = 1;
-    widgets.show_epg = 1;
+
     gtk_window_present(GTK_WINDOW(widgets.main_window));
     
 /*    if (!appdata.recorder)*/
@@ -560,11 +675,29 @@ int main(int argc, char **argv)
     fprintf(stderr, "recorder video source: %d\n", fd);
     video_output_set_infile(appdata.video_output, fd);
 
-    main_action_set_volume(1.0);
+    /* read from status */
+    if (!appstatus.recorder.initialized) {
+        appstatus.recorder.initialized = 1;
+        appstatus.recorder.volume = 1.0;
+        appstatus.recorder.running = 0;
+        appstatus.recorder.channel_id = 0;
+        appstatus.recorder.mute = 0;
+
+        main_action_set_volume(1.0);
+    }
+    else {
+        main_action_set_volume(appstatus.recorder.volume);
+        main_action_set_mute(appstatus.recorder.mute);
+
+        if (appstatus.recorder.running)
+            dvb_recorder_set_channel(appdata.recorder, appstatus.recorder.channel_id);
+    }
 
 /*    dvb_recorder_set_channel(appdata.recorder, 0);*/
 
     gtk_main();
+
+    status_save(&appstatus, status_file);
 
     fprintf(stderr, "destroying video\n");
     video_output_destroy(appdata.video_output);

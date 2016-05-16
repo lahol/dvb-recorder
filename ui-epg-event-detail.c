@@ -6,8 +6,7 @@
 struct _UiEpgEventDetailPrivate {
     /* private data */
     GtkWidget *title_label;
-    GtkWidget *short_description;
-    GtkWidget *extended_description;
+    GtkWidget *description;
 
     EPGEvent *event;
 };
@@ -94,28 +93,27 @@ static void populate_widget(UiEpgEventDetail *self)
     self->priv->title_label = gtk_label_new("Title");
     gtk_widget_set_halign(self->priv->title_label, GTK_ALIGN_START);
 
-    self->priv->short_description = gtk_label_new("Short description");
-    gtk_widget_set_halign(self->priv->short_description, GTK_ALIGN_START);
-
-    self->priv->extended_description = gtk_text_view_new();
-    gtk_text_view_set_editable(GTK_TEXT_VIEW(self->priv->extended_description), FALSE);
-    gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(self->priv->extended_description), GTK_WRAP_WORD_CHAR);
+    self->priv->description = gtk_text_view_new();
+    gtk_text_view_set_editable(GTK_TEXT_VIEW(self->priv->description), FALSE);
+    gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(self->priv->description), GTK_WRAP_WORD_CHAR);
+    gtk_text_view_set_justification(GTK_TEXT_VIEW(self->priv->description), GTK_JUSTIFY_FILL);
 
     gtk_box_pack_start(GTK_BOX(vbox), self->priv->title_label, FALSE, FALSE, 0);
 
-    gtk_box_pack_start(GTK_BOX(desc_box), self->priv->short_description, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(desc_box), self->priv->extended_description, TRUE, TRUE, 0);
 
     GtkWidget *scroll = gtk_scrolled_window_new(NULL, NULL);
     gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
             GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
+    gtk_scrolled_window_set_shadow_type(GTK_SCROLLED_WINDOW(scroll), GTK_SHADOW_ETCHED_IN);
 
+    gtk_box_pack_start(GTK_BOX(desc_box), self->priv->description, TRUE, TRUE, 0);
     gtk_container_add(GTK_CONTAINER(scroll), desc_box);
 
     gtk_box_pack_start(GTK_BOX(vbox), scroll, TRUE, TRUE, 0);
 
     gtk_widget_show_all(vbox);
     gtk_container_add(GTK_CONTAINER(self), vbox);
+
 }
 
 static void ui_epg_event_detail_init(UiEpgEventDetail *self)
@@ -133,40 +131,101 @@ GtkWidget *ui_epg_event_detail_new(void)
     return g_object_new(UI_EPG_EVENT_DETAIL_TYPE, NULL);
 }
 
+/* extra short event to hand over control of which short event is to be printed to a higher level */
+gchar *_ui_epg_event_detail_format_header(EPGEvent *event, EPGShortEvent *sev)
+{
+    if (event == NULL)
+        return g_strdup("<i>no description</i>");
+
+    GString *content = g_string_new(NULL);
+    gchar buf[256];
+    gchar *buffer = NULL;
+    if (sev) {
+        buffer = util_translate_control_codes_to_markup(sev->description);
+    }
+
+    if (buffer) {
+        g_string_append_printf(content, "<b>%s</b>\n", buffer);
+        g_free(buffer);
+    }
+    else {
+        g_string_append(content, "<i>no description</i>\n");
+    }
+
+    util_time_to_string(buf, 256, event->starttime, TRUE);
+    g_string_append(content, buf);
+    
+    util_duration_to_string(buf, 256, event->duration);
+    g_string_append_printf(content, " – %s", buf);
+
+    return g_string_free(content, FALSE);
+}
+
+gchar *_ui_epg_event_detail_format_description(EPGShortEvent *sh_event, EPGExtendedEvent *ext_event)
+{
+    if (ext_event == NULL && sh_event == NULL)
+        return g_strdup("<i>no description available</i>");;
+
+    GString *content = g_string_new(NULL);
+
+    gchar *buffer;
+    if (sh_event) {
+        buffer = util_translate_control_codes_to_markup(sh_event->text);
+        g_string_append(content, buffer);
+        g_free(buffer);
+        g_string_append(content, "\n\n");
+    }
+
+    if (ext_event == NULL)
+        return g_string_free(content, FALSE);
+
+    buffer = util_translate_control_codes_to_markup(ext_event->text);
+    g_string_append(content, buffer);
+    g_free(buffer);
+
+    GList *tmp;
+    EPGExtendedEventItem *desc;
+    for (tmp = ext_event->description_items; tmp; tmp = g_list_next(tmp)) {
+        desc = (EPGExtendedEventItem *)tmp->data;
+        g_string_append_c(content, '\n');
+
+        buffer = util_translate_control_codes_to_markup(desc->description);
+        g_string_append(content, buffer);
+        g_free(buffer);
+
+        g_string_append_c(content, '\t');
+
+        buffer = util_translate_control_codes_to_markup(desc->content);
+        g_string_append(content, buffer);
+        g_free(buffer);
+    }
+
+    return g_string_free(content, FALSE);
+}
+
 void ui_epg_event_detail_set_event(UiEpgEventDetail *self, EPGEvent *event)
 {
     g_return_if_fail(IS_UI_EPG_EVENT_DETAIL(self));
 
     EPGShortEvent *sev = NULL;
+    EPGExtendedEvent *eev = NULL;
     GtkTextBuffer *buffer;
     gchar *text;
 
     if (event) {
         sev = event->short_descriptions ? event->short_descriptions->data : NULL;
-        if (sev) {
-            text = util_translate_control_codes_to_markup(sev->description);
-            gtk_label_set_text(GTK_LABEL(self->priv->title_label), text);
-            g_free(text);
+        eev = event->extended_descriptions ? event->extended_descriptions->data : NULL;
 
-            text = util_translate_control_codes_to_markup(sev->text);
-            gtk_label_set_text(GTK_LABEL(self->priv->short_description), text);
-            g_free(text);
-        }
-        else {
-            gtk_label_set_markup(GTK_LABEL(self->priv->title_label), "<i>no description</i>");
-            gtk_label_set_markup(GTK_LABEL(self->priv->short_description), "<i>no short description</i>");
-        }
+        text = _ui_epg_event_detail_format_header(event, sev);
+        gtk_label_set_markup(GTK_LABEL(self->priv->title_label), text);
+        g_free(text);
 
-        buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(self->priv->extended_description));
-        if (event->extended_descriptions && event->extended_descriptions->data) {
-            text = util_translate_control_codes_to_markup(((EPGExtendedEvent *)(event->extended_descriptions->data))->text);
-            gtk_text_buffer_set_text(buffer, text, -1);
-            g_free(text);
-        }
-        else {
-            gtk_text_buffer_set_text(buffer, "<i>no extended description</i>", -1);
-        }
-    }
+        buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(self->priv->description));
+
+        text = _ui_epg_event_detail_format_description(sev, eev);
+        gtk_text_buffer_set_text(buffer, text, -1);
+        g_free(text);
+     }
 
     if (self->priv->event != event)
         epg_event_free(self->priv->event);
