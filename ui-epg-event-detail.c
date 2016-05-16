@@ -97,10 +97,15 @@ static void populate_widget(UiEpgEventDetail *self)
     gtk_text_view_set_editable(GTK_TEXT_VIEW(self->priv->description), FALSE);
     gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(self->priv->description), GTK_WRAP_WORD_CHAR);
     gtk_text_view_set_justification(GTK_TEXT_VIEW(self->priv->description), GTK_JUSTIFY_FILL);
+    gtk_text_view_set_left_margin(GTK_TEXT_VIEW(self->priv->description), 5);
+    gtk_text_view_set_right_margin(GTK_TEXT_VIEW(self->priv->description), 13);
+    gtk_text_view_set_top_margin(GTK_TEXT_VIEW(self->priv->description), 2);
+    gtk_text_view_set_bottom_margin(GTK_TEXT_VIEW(self->priv->description), 2);
 
     gtk_box_pack_start(GTK_BOX(vbox), self->priv->title_label, FALSE, FALSE, 0);
 
 
+    /* FIXME: text view should resize (horizontal) when widget is resized */
     GtkWidget *scroll = gtk_scrolled_window_new(NULL, NULL);
     gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
             GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);

@@ -82,7 +82,7 @@ void main_window_status_set_show(GtkWidget *window, GuiWindowStatus *status, gbo
 
 void main_window_status_toggle_show(GtkWidget *window, GuiWindowStatus *status)
 {
-    main_window_status_set_show(window, status, !status->show_window);
+    main_window_status_set_show(window, status, !status->show_window || !status->is_visible);
 }
 
 void main_window_status_set_fullscreen(gboolean fullscreen)
@@ -99,6 +99,9 @@ void main_window_status_set_fullscreen(gboolean fullscreen)
         gtk_window_unfullscreen(GTK_WINDOW(widgets.main_window));
         appstatus.gui.main_window.fullscreen = 0;
     }
+
+    /* focus main window */
+    gtk_window_present(GTK_WINDOW(widgets.main_window));
 }
 
 gboolean main_window_status_configure_event(GtkWidget *window, GdkEventConfigure *event, GuiWindowStatus *win_status)
@@ -665,17 +668,25 @@ int main(int argc, char **argv)
     main_init_epg_dialog();
     ui_epg_list_set_recorder_handle(UI_EPG_LIST(widgets.epg_list), appdata.recorder);
 
+    if (appstatus.gui.main_window.initialized &&
+            appstatus.gui.main_window.fullscreen)
+        main_window_status_set_fullscreen(TRUE);
+
+    if (appstatus.gui.channels_dialog.initialized)
+        main_window_status_set_show(widgets.channels_dialog, &appstatus.gui.channels_dialog,
+                                    appstatus.gui.channels_dialog.show_window);
+    if (appstatus.gui.epg_dialog.initialized)
+        main_window_status_set_show(widgets.epg_dialog, &appstatus.gui.epg_dialog,
+                                    appstatus.gui.epg_dialog.show_window);
+
     gtk_window_present(GTK_WINDOW(widgets.main_window));
-    
-/*    if (!appdata.recorder)*/
-        
+
     appdata.video_output = video_output_new(widgets.drawing_area);
 
     int fd = dvb_recorder_enable_video_source(appdata.recorder, TRUE);
     fprintf(stderr, "recorder video source: %d\n", fd);
     video_output_set_infile(appdata.video_output, fd);
 
-    /* read from status */
     if (!appstatus.recorder.initialized) {
         appstatus.recorder.initialized = 1;
         appstatus.recorder.volume = 1.0;
@@ -692,8 +703,6 @@ int main(int argc, char **argv)
         if (appstatus.recorder.running)
             dvb_recorder_set_channel(appdata.recorder, appstatus.recorder.channel_id);
     }
-
-/*    dvb_recorder_set_channel(appdata.recorder, 0);*/
 
     gtk_main();
 
