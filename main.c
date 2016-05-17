@@ -167,23 +167,16 @@ void main_toggle_fullscreen(void)
 
 void main_action_snapshot(void)
 {
-    gchar fbuf[256];
-    time_t t;
-    struct tm *tmp;
-    t = time(NULL);
-    tmp = localtime(&t);
-
     gchar *snapshot_dir = main_get_snapshot_dir();
-    strftime(fbuf, 256, "snapshot-%Y%m%d-%H%M%S.png", tmp);
-    gchar *filename = g_build_filename(
-            snapshot_dir,
-            fbuf,
-            NULL);
-    g_free(snapshot_dir);
+
+    gchar *filename = dvb_recorder_make_record_filename(appdata.recorder, snapshot_dir, "snapshot-${service_name}-${program_name}-${date:%Y%m%d-%H%M%S}.png");
+
+    fprintf(stderr, "[snapshot] filename: %s\n", filename);
 
     video_output_snapshot(appdata.video_output, filename);
 
     g_free(filename);
+    g_free(snapshot_dir);
 }
 
 void main_action_record(void)
@@ -194,24 +187,15 @@ void main_action_record(void)
         dvb_recorder_record_stop(appdata.recorder);
     }
     else {
-        gchar fbuf[256];
-        time_t t;
-        struct tm *tmp;
-        t = time(NULL);
-        tmp = localtime(&t);
 
+        /* FIXME: this needs only be done once */
         gchar *capture_dir = main_get_capture_dir();
-        strftime(fbuf, 256, "capture-%Y%m%d-%H%M%S.ts", tmp);
-        gchar *filename = g_build_filename(
-                capture_dir,
-                fbuf,
-                NULL);
+        dvb_recorder_set_capture_dir(appdata.recorder, capture_dir);
         g_free(capture_dir);
+        dvb_recorder_set_record_filename_pattern(appdata.recorder, "capture-${date:%Y%m%d-%H%M%S}.ts");
 
         fprintf(stderr, "Start recording.\n");
-        dvb_recorder_record_start(appdata.recorder, filename);
-
-        g_free(filename);
+        dvb_recorder_record_start(appdata.recorder);
     }
 }
 
