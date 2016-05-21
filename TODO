@@ -1,10 +1,14 @@
 = TODO =
- * save status on exit (ini-file): last watched channel, mute/volume settings, (window positions)
- * display EIT
- * format string for custom record output
+ ✔ save status on exit (ini-file): last watched channel, mute/volume settings, (window positions)
+ ✔ display EIT
+ * format string for custom record output (partially done)
  * select tables for recording
  * hide mouse cursor in fullscreen mode
- * BUG: channel switching (requires two activations)
+ ? BUG: channel switching (requires two activations)
  * (custom) sort channel list
  * adapt window size to content
  * restore focus after unfullscreen
+ * move record/snapshot button to own dialog (together with table settings)
+ * handle multiple audio
+ * subtitles
+ * [lib] retrieve current program (from eit 0x48, maybe take next program if it starts in a few seconds)
