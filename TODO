@@ -12,3 +12,6 @@
  * handle multiple audio
  * subtitles
  * [lib] retrieve current program (from eit 0x48, maybe take next program if it starts in a few seconds)
+ * scheduled recording
+ * configure resume channel
+ * configure adapt window size to content
