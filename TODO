@@ -15,3 +15,8 @@
  * scheduled recording
  * configure resume channel
  * configure adapt window size to content
+ * teletext
+ * osd (subtitles, change of program, status)
+ * configure keyboard shortcuts
+ * select audio channel
+ * [lib+scan] support satellites Astra 19.2 E (S19E2), Hotbird 13.0 E (S13E0), Eurobird 9.0 E (S9E0 – 9.0 east Eurobird 9); make this configurable (get list via w_scan -c?)

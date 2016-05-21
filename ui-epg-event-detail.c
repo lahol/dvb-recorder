@@ -176,17 +176,21 @@ gchar *_ui_epg_event_detail_format_description(EPGShortEvent *sh_event, EPGExten
     gchar *buffer;
     if (sh_event) {
         buffer = util_translate_control_codes_to_markup(sh_event->text);
-        g_string_append(content, buffer);
-        g_free(buffer);
-        g_string_append(content, "\n\n");
+        if (buffer) {
+            g_string_append(content, buffer);
+            g_free(buffer);
+            g_string_append(content, "\n\n");
+        }
     }
 
     if (ext_event == NULL)
         return g_string_free(content, FALSE);
 
     buffer = util_translate_control_codes_to_markup(ext_event->text);
-    g_string_append(content, buffer);
-    g_free(buffer);
+    if (buffer) {
+        g_string_append(content, buffer);
+        g_free(buffer);
+    }
 
     GList *tmp;
     EPGExtendedEventItem *desc;
@@ -195,14 +199,18 @@ gchar *_ui_epg_event_detail_format_description(EPGShortEvent *sh_event, EPGExten
         g_string_append_c(content, '\n');
 
         buffer = util_translate_control_codes_to_markup(desc->description);
-        g_string_append(content, buffer);
-        g_free(buffer);
+        if (buffer) {
+            g_string_append(content, buffer);
+            g_free(buffer);
+        }
 
         g_string_append_c(content, '\t');
 
         buffer = util_translate_control_codes_to_markup(desc->content);
-        g_string_append(content, buffer);
-        g_free(buffer);
+        if (buffer) {
+            g_string_append(content, buffer);
+            g_free(buffer);
+        }
     }
 
     return g_string_free(content, FALSE);
