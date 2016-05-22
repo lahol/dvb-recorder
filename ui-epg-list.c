@@ -2,6 +2,7 @@
 #include <glib/gi18n.h>
 #include <glib/gprintf.h>
 #include "ui-epg-event-detail.h"
+#include "utils.h"
 
 struct _UiEpgListPrivate {
     /* private data */
@@ -51,7 +52,7 @@ static void ui_epg_list_finalize(GObject *gobject)
 static void ui_epg_list_set_property(GObject *object, guint prop_id, 
         const GValue *value, GParamSpec *spec)
 {
-    UiEpgList *self = UI_EPG_LIST(object);
+    /*UiEpgList *self = UI_EPG_LIST(object);*/
 
     switch (prop_id) {
        /* case PROP_RECORDER:
@@ -65,7 +66,7 @@ static void ui_epg_list_set_property(GObject *object, guint prop_id,
 static void ui_epg_list_get_property(GObject *object, guint prop_id,
         GValue *value, GParamSpec *spec)
 {
-    UiEpgList *self = UI_EPG_LIST(object);
+    /*UiEpgList *self = UI_EPG_LIST(object);*/
 
     switch (prop_id) {
     	/* case PROP_*:
@@ -97,11 +98,13 @@ static void ui_epg_list_class_init(UiEpgListClass *klass)
     g_type_class_add_private(G_OBJECT_CLASS(klass), sizeof(UiEpgListPrivate));
 }
 
+#if 0
 static gint ui_epg_list_box_sort_func(GtkListBoxRow *row1, GtkListBoxRow *row2, gpointer userdata)
 {
     /* get event time from row items -> get child (gtk_bin_get_child(row1)) */
     return 1;
 }
+#endif
 
 static void ui_epg_list_row_activated(UiEpgList *self, GtkTreePath *path, GtkTreeViewColumn *column, GtkTreeView *tv)
 {

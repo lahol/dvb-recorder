@@ -165,9 +165,15 @@ static void populate_widget(ChannelList *self)
     /* channel list */
     self->priv->channel_tree_view = gtk_tree_view_new();
 
-    GtkCellRenderer *renderer = gtk_cell_renderer_text_new();
+    GtkCellRenderer *renderer;
     GtkTreeViewColumn *column;
 
+    renderer = gtk_cell_renderer_text_new();
+    column = gtk_tree_view_column_new_with_attributes(_("Source"),
+            renderer, "text", CHNL_ROW_SOURCE, "foreground", CHNL_ROW_FOREGROUND, NULL);
+    gtk_tree_view_append_column(GTK_TREE_VIEW(self->priv->channel_tree_view), column);
+
+    renderer = gtk_cell_renderer_text_new();
     column = gtk_tree_view_column_new_with_attributes(_("Title"),
             renderer, "text", CHNL_ROW_TITLE, "foreground", CHNL_ROW_FOREGROUND, NULL);
     gtk_tree_view_append_column(GTK_TREE_VIEW(self->priv->channel_tree_view), column);
@@ -202,6 +208,7 @@ static void channel_list_init(ChannelList *self)
     GtkListStore *store = gtk_list_store_new(CHNL_N_ROWS, 
             G_TYPE_INT,      /* id */
             G_TYPE_STRING,   /* title */
+            G_TYPE_STRING,   /* signalsource */
             G_TYPE_STRING);  /* foreground */
     channel_list_set_model(self, GTK_TREE_MODEL(store));
     g_object_unref(G_OBJECT(store));
@@ -286,6 +293,7 @@ void channel_list_fill_cb(ChannelData *data, GtkListStore *store)
     gtk_list_store_set(store, &iter,
            CHNL_ROW_ID, data->id,
            CHNL_ROW_TITLE, data->name,
+           CHNL_ROW_SOURCE, data->signalsource,
            CHNL_ROW_FOREGROUND, data->flags & CHNL_FLAG_DIRTY ? "gray" : NULL,
            -1);
 }

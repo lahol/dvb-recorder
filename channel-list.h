@@ -20,6 +20,7 @@ typedef struct _ChannelListClass ChannelListClass;
 typedef enum {
     CHNL_ROW_ID,
     CHNL_ROW_TITLE,
+    CHNL_ROW_SOURCE,
     CHNL_ROW_FOREGROUND,
     CHNL_N_ROWS
 } ChannelListStoreEntry;
