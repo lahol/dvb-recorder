@@ -11,7 +11,8 @@ typedef struct _ChannelFavListEntry ChannelFavListEntry;
 
 enum ChannelFavListFlag {
     CFL_FLAG_NEW = 1<<0,
-    CFL_FLAG_CHANGED = 1 << 1
+    CFL_FLAG_CHANGED = 1 << 1,
+    CFL_FLAG_REMOVED = 1 << 2
 };
 
 struct _ChannelFavList {
@@ -145,7 +146,8 @@ enum {
 
 enum {
     TARGET_ID,
-    TARGET_STRING
+    TARGET_STRING,
+    TARGET_ROW
 };
 
 void _channel_favourites_dialog_free_channel_fav_list_entry(ChannelFavListEntry *entry)
@@ -264,12 +266,37 @@ void _channel_favourites_drag_data_get(GtkWidget *widget, GdkDragContext *contex
             sizeof(id));
 }
 
+void _channel_favourites_favourites_drag_data_get(GtkWidget *widget, GdkDragContext *context,
+        GtkSelectionData *sel_data, guint info, guint time, gpointer userdata)
+{
+    fprintf(stderr, "favourites drag data get\n");
+
+    GtkTreeIter iter;
+    GtkTreeModel *store;
+    GtkTreeSelection *selection;
+    gboolean rv;
+
+    selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(widget));
+    rv = gtk_tree_selection_get_selected(selection, &store, &iter);
+
+    if (rv == FALSE) {
+        fprintf(stderr, "nothing selected\n");
+        return;
+    }
+
+    gtk_selection_data_set(sel_data,
+            gdk_atom_intern("channel fav row", FALSE),
+            8,
+            (void *)&iter,
+            sizeof(iter));
+    fprintf(stderr, "get iter: %d %p %p %p\n", iter.stamp, iter.user_data, iter.user_data2, iter.user_data3);
+}
 
 void _channel_favourites_drag_data_received(GtkWidget *widget, GdkDragContext *context,
         gint x, gint y, GtkSelectionData *sel_data, guint info, guint time, ChannelFavouritesDialog *dialog)
 {
 /*    g_signal_stop_emission_by_name(G_OBJECT(widget), "drag-data-received");*/
-    fprintf(stderr, "drag data received\n");
+    fprintf(stderr, "drag data received for %p\n", widget);
     GtkTreeModel *store;
     GtkTreeIter iter, sibling;
     GtkTreeView *tree_view = GTK_TREE_VIEW(widget);
@@ -282,13 +309,16 @@ void _channel_favourites_drag_data_received(GtkWidget *widget, GdkDragContext *c
         store = gtk_tree_model_filter_get_model(GTK_TREE_MODEL_FILTER(store));
     }
 
-    suggested_action = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(context),
-                "gtk-tree-view-status-pending"));
-    fprintf(stderr, "suggested action: %d\n", suggested_action);
+    /*suggested_action = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(context),
+                "gtk-tree-view-status-pending"));*/
+    suggested_action = gdk_drag_context_get_suggested_action(context);
+    fprintf(stderr, "suggested action: %d (def: %d, copy: %d, move: %d, link: %d\n", suggested_action,
+            GDK_ACTION_DEFAULT, GDK_ACTION_COPY, GDK_ACTION_MOVE, GDK_ACTION_LINK);
     if (suggested_action) {
         /* get data due to request in drag_motion not drag_drop so just call drag_status, do not paste data
          * see: gtktreeview.c:gtk_tree_view_drag_data_received()*/
-        gtk_tree_view_get_drag_dest_row(tree_view, &path, &pos);
+        gtk_tree_view_get_dest_row_at_pos(tree_view, x, y, &path, &pos);
+        fprintf(stderr, "path: %p, pos: %d\n", path, pos);
         if (path == NULL)
             suggested_action = 0;
         else {
@@ -309,8 +339,10 @@ void _channel_favourites_drag_data_received(GtkWidget *widget, GdkDragContext *c
             }
         }
         if (suggested_action) {
-            if (!gtk_tree_drag_dest_row_drop_possible(GTK_TREE_DRAG_DEST(store), path, sel_data))
+            if (!gtk_tree_drag_dest_row_drop_possible(GTK_TREE_DRAG_DEST(store), path, sel_data)) {
+                fprintf(stderr, "drop not possible\n");
                 suggested_action = 0;
+            }
         }
 
         gdk_drag_status(context, suggested_action, time);
@@ -320,21 +352,36 @@ void _channel_favourites_drag_data_received(GtkWidget *widget, GdkDragContext *c
 
         if (suggested_action == 0)
             gtk_tree_view_set_drag_dest_row(tree_view, NULL, GTK_TREE_VIEW_DROP_BEFORE);
-        return;
     }
 
     const guchar *data = gtk_selection_data_get_data(sel_data);
     gint insert_position = -1;
     gint *indices = NULL;
+    GtkTreeIter source_iter;
 
-    ChannelData *chnl_data = channel_db_get_channel(*((guint32 *)data));
+    fprintf(stderr, "selection data: %p\n", data);
+    ChannelData *chnl_data = NULL;
+    guint chnl_id = 0;
+
+    if (data) {
+        if (info != TARGET_ROW )
+            chnl_data = channel_db_get_channel(*((guint32 *)data));
+        else {
+            memcpy(&source_iter, data, sizeof(GtkTreeIter));
+            gtk_tree_model_get(store, &source_iter, CHNL_ROW_ID, &chnl_id, -1);
+        fprintf(stderr, "recv iter: %d %p %p %p\n", source_iter.stamp, source_iter.user_data, source_iter.user_data2, source_iter.user_data3);
+        }
+    }
 
     if (chnl_data != NULL) {
+        /* FIXME: fails when moving inside treeview */
         if (dialog->priv->current_fav_list && 
                 g_list_find_custom(dialog->priv->current_fav_list->entries,
                 GUINT_TO_POINTER(chnl_data->id),
                 (GCompareFunc)_fav_list_find_entry_by_id)) {
+            fprintf(stderr, "already in list\n");
             gtk_drag_finish(context, FALSE, FALSE, time);
+            channel_data_free(chnl_data);
             return;
         }
 
@@ -361,9 +408,39 @@ void _channel_favourites_drag_data_received(GtkWidget *widget, GdkDragContext *c
             }
             gtk_tree_path_free(path);
         }
+        gtk_drag_finish(context, TRUE, FALSE, time);
+    }
+    else if (info == TARGET_ROW) {
+        if (!gtk_tree_view_get_dest_row_at_pos(tree_view, x, y, &path, &pos)) {
+            fprintf(stderr, "dest not found\n");
+            gtk_list_store_move_before(GTK_LIST_STORE(store), &source_iter, NULL);
+        }
+        else {
+            gtk_tree_model_get_iter(GTK_TREE_MODEL(store), &sibling, path);
+            indices = gtk_tree_path_get_indices(path);
+            if (indices) {
+                insert_position = indices[0];
+            }
+            switch (pos) {
+                case GTK_TREE_VIEW_DROP_BEFORE:
+                case GTK_TREE_VIEW_DROP_INTO_OR_BEFORE:
+                    gtk_list_store_move_before(GTK_LIST_STORE(store), &source_iter, &sibling);
+                    break;
+                case GTK_TREE_VIEW_DROP_AFTER:
+                case GTK_TREE_VIEW_DROP_INTO_OR_AFTER:
+                    gtk_list_store_move_after(GTK_LIST_STORE(store), &source_iter, &sibling);
+                    if (insert_position >= 0)
+                        ++insert_position;
+                    break;
+            }
+            gtk_tree_path_free(path);
+        }
+        gtk_drag_finish(context, TRUE, FALSE, time);
+    }
+    else {
+        gtk_drag_finish(context, FALSE, FALSE, time);
     }
 
-    gtk_drag_finish(context, TRUE, FALSE, time);
 
     if (chnl_data != NULL) {
         fprintf(stderr, "insert at position: %d\n", insert_position);
@@ -381,6 +458,27 @@ void _channel_favourites_drag_data_received(GtkWidget *widget, GdkDragContext *c
             dialog->priv->current_fav_list->flags |= CFL_FLAG_CHANGED;
         }
 
+        channel_data_free(chnl_data);
+    }
+    else if (info == TARGET_ROW) {
+        GList *link = NULL;
+        gpointer link_data;
+        if (dialog->priv->current_fav_list &&
+                (link = g_list_find_custom(dialog->priv->current_fav_list->entries,
+                        GUINT_TO_POINTER(chnl_id),
+                        (GCompareFunc)_fav_list_find_entry_by_id))) {
+            link_data = link->data;
+            fprintf(stderr, "move from %d to %d\n", g_list_position(dialog->priv->current_fav_list->entries, link), insert_position);
+            dialog->priv->current_fav_list->entries =
+                g_list_delete_link(dialog->priv->current_fav_list->entries, link);
+            if (insert_position >= 0)
+                dialog->priv->current_fav_list->entries =
+                    g_list_insert(dialog->priv->current_fav_list->entries, link_data, insert_position);
+            else
+                dialog->priv->current_fav_list->entries =
+                    g_list_append(dialog->priv->current_fav_list->entries, link_data);
+            dialog->priv->current_fav_list->flags |= CFL_FLAG_CHANGED;
+        }
     }
 }
 
@@ -575,6 +673,7 @@ static void channel_favourites_dialog_init(ChannelFavouritesDialog *self)
     GtkTreeView *tv;
 
     static GtkTargetEntry targetentries[] = {
+        { "FAV_ENTRIES_ROW", GTK_TARGET_SAME_WIDGET, TARGET_ROW },
         { "STRING", GTK_TARGET_SAME_APP, TARGET_STRING },
         { "INTEGER", GTK_TARGET_SAME_APP, TARGET_ID }
     };
@@ -583,10 +682,15 @@ static void channel_favourites_dialog_init(ChannelFavouritesDialog *self)
     self->priv->channels_selected = channel_list_get_list_store(CHANNEL_LIST(self->priv->channel_fav_list));
     /* drag and drop */
     tv = channel_list_get_tree_view(CHANNEL_LIST(self->priv->channel_fav_list));
-    gtk_tree_view_enable_model_drag_dest(GTK_TREE_VIEW(tv), targetentries, 2,
+    fprintf(stderr, "Favlist: %p\n", tv);
+    gtk_tree_view_enable_model_drag_dest(GTK_TREE_VIEW(tv), targetentries, 3,
+            GDK_ACTION_COPY | GDK_ACTION_MOVE);
+    gtk_tree_view_enable_model_drag_source(GTK_TREE_VIEW(tv), GDK_BUTTON1_MASK, targetentries, 3,
             GDK_ACTION_COPY | GDK_ACTION_MOVE);
     g_signal_connect(G_OBJECT(tv), "drag-data-received",
             G_CALLBACK(_channel_favourites_drag_data_received), self);
+    g_signal_connect(G_OBJECT(tv), "drag-data-get",
+            G_CALLBACK(_channel_favourites_favourites_drag_data_get), NULL);
     gtk_box_pack_start(GTK_BOX(hbox), self->priv->channel_fav_list, TRUE, TRUE, 3);
     gtk_widget_set_sensitive(GTK_WIDGET(tv), FALSE);
 
@@ -594,7 +698,8 @@ static void channel_favourites_dialog_init(ChannelFavouritesDialog *self)
     self->priv->channels_all = channel_list_get_list_store(CHANNEL_LIST(self->priv->channel_all_list));
     /* drag and drop */
     tv = channel_list_get_tree_view(CHANNEL_LIST(self->priv->channel_all_list));
-    gtk_tree_view_enable_model_drag_source(GTK_TREE_VIEW(tv), GDK_BUTTON1_MASK, targetentries, 2,
+    fprintf(stderr, "Channellist: %p\n", tv);
+    gtk_tree_view_enable_model_drag_source(GTK_TREE_VIEW(tv), GDK_BUTTON1_MASK, targetentries, 3,
             GDK_ACTION_COPY | GDK_ACTION_MOVE);
     g_signal_connect(G_OBJECT(tv), "drag-data-get",
             G_CALLBACK(_channel_favourites_drag_data_get), NULL);
