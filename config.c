@@ -30,6 +30,8 @@ void config_free(void)
 
 gint config_get(gchar *group, gchar *key, CfgType type, gpointer value)
 {
+    if (!g_key_file_has_key(_config_keyfile, group, key, NULL))
+        return 1;
     GError *err = NULL;
     switch (type) {
         case CFG_TYPE_STRING:

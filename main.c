@@ -168,8 +168,15 @@ void main_toggle_fullscreen(void)
 void main_action_snapshot(void)
 {
     gchar *snapshot_dir = main_get_snapshot_dir();
-
-    gchar *filename = dvb_recorder_make_record_filename(appdata.recorder, snapshot_dir, "snapshot-${service_name}-${program_name}-${date:%Y%m%d-%H%M%S}.png");
+    gchar *pattern = NULL;
+    gchar *filename;
+    if (config_get("main", "snapshot-filename", CFG_TYPE_STRING, &pattern) == 0) {
+        filename = dvb_recorder_make_record_filename(appdata.recorder, snapshot_dir, pattern);
+        g_free(pattern);
+    }
+    else {
+        filename = dvb_recorder_make_record_filename(appdata.recorder, snapshot_dir, "snapshot-${service_name}-${program_name}-${date:%Y%m%d-%H%M%S}.png");
+    }
 
     fprintf(stderr, "[snapshot] filename: %s\n", filename);
 
@@ -187,13 +194,6 @@ void main_action_record(void)
         dvb_recorder_record_stop(appdata.recorder);
     }
     else {
-
-        /* FIXME: this needs only be done once */
-        gchar *capture_dir = main_get_capture_dir();
-        dvb_recorder_set_capture_dir(appdata.recorder, capture_dir);
-        g_free(capture_dir);
-        dvb_recorder_set_record_filename_pattern(appdata.recorder, "capture-${date:%Y%m%d-%H%M%S}.ts");
-
         fprintf(stderr, "Start recording.\n");
         dvb_recorder_record_start(appdata.recorder);
     }
@@ -646,6 +646,18 @@ int main(int argc, char **argv)
 
     /* setup librecorder */
     appdata.recorder = dvb_recorder_new(main_recorder_event_callback, NULL);
+
+    gchar *value;
+    value = main_get_capture_dir();
+    dvb_recorder_set_capture_dir(appdata.recorder, value);
+    g_free(value);
+    if (config_get("main", "capture-filename", CFG_TYPE_STRING, &value) == 0) {
+        dvb_recorder_set_record_filename_pattern(appdata.recorder, value);
+        g_free(value);
+    }
+    else {
+        dvb_recorder_set_record_filename_pattern(appdata.recorder, "capture-${service_name}-${program_name}-${date:%Y%m%d-%H%M%S}.ts");
+    }
 
     main_init_window();
     main_init_channels_dialog();
