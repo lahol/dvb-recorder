@@ -346,6 +346,14 @@ gpointer video_output_thread_proc(VideoOutput *vo)
     return NULL;
 }
 
+static void video_output_unknown_type_handler(GstElement *bin, GstPad *pad, GstCaps *caps, gpointer data)
+{
+    GstStructure *structure = gst_caps_get_structure(caps, 0);
+    const gchar *type = gst_structure_get_name(structure);
+
+    fprintf(stderr, "unknown type: %s\n", type);
+}
+
 static void video_output_pad_added_handler(GstElement *src, GstPad *new_pad, VideoOutput *vo)
 {
     g_print("Pad added: %s from %s\n", GST_PAD_NAME(new_pad), GST_ELEMENT_NAME(src));
@@ -508,6 +516,8 @@ void video_output_setup_pipeline(VideoOutput *vo)
 #endif
     g_signal_connect(G_OBJECT(decoder), "pad-added",
             G_CALLBACK(video_output_pad_added_handler), vo);
+    g_signal_connect(G_OBJECT(decoder), "unknown-type",
+            G_CALLBACK(video_output_unknown_type_handler), NULL);
 
     fprintf(stderr, "pipeline: %p, source: %p, decoder: %p\n",
             vo->pipeline, source, decoder);
