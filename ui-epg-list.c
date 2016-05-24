@@ -187,7 +187,7 @@ static void populate_widget(UiEpgList *self)
     store = gtk_list_store_new(EPG_N_ROWS,
                                G_TYPE_UINT,     /* id */
                                G_TYPE_STRING,   /* title */
-                               G_TYPE_UINT64,   /* starttime */
+                               G_TYPE_INT64,    /* starttime */
                                G_TYPE_UINT,     /* duration */
                                G_TYPE_POINTER,  /* reserved: short desc */
                                G_TYPE_POINTER,  /* reserved: extendet desc */
@@ -302,7 +302,7 @@ static gboolean _ui_epg_list_update_events_idle(struct _ui_epg_list_update_data 
         gtk_list_store_set(store, &iter,
                 EPG_ROW_TITLE, sev ? sev->description : "<i>no description</i>",
                 EPG_ROW_ID, ev->event_id,
-                EPG_ROW_STARTTIME, ev->starttime,
+                EPG_ROW_STARTTIME, (gint64)ev->starttime,
                 EPG_ROW_DURATION, ev->duration,
                 EPG_ROW_STARTTIME_STRING, starttime_str,
                 EPG_ROW_DURATION_STRING, duration_str,
