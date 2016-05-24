@@ -14,6 +14,7 @@
 #endif
 #include <gst/base/gstbasesink.h>
 #include <gst/audio/streamvolume.h>
+#include <gst/video/video.h>
 #include <gdk/gdkx.h>
 
 #include "video-output.h"
@@ -32,6 +33,9 @@ struct _VideoOutput {
 
     GstElement *vsink;
     GstElement *playsink;
+    GstElement *cairooverlay;
+    GstElement *videoconvert[2];
+    GstVideoInfo videoinfo;
 
     GThread *thread;
     GMutex pipeline_mutex;
@@ -40,6 +44,7 @@ struct _VideoOutput {
     gdouble volume;
     uint32_t write_error : 1;
     uint32_t is_muted : 1;
+    uint32_t videoinfo_valid : 1;
 };
 
 void video_output_setup_pipeline(VideoOutput *vo);
@@ -373,19 +378,25 @@ static void video_output_pad_added_handler(GstElement *src, GstPad *new_pad, Vid
 
     fprintf(stderr, "VideoOutput, pad new type: %s\n", new_pad_type);
 
-    GstElementClass *cls = GST_ELEMENT_GET_CLASS(vo->playsink);
+    GstElementClass *cls;
     GstPadTemplate *templ = NULL;
 
     if (g_str_has_prefix(new_pad_type, "audio")) {
+        cls = GST_ELEMENT_GET_CLASS(vo->playsink);
         templ = gst_element_class_get_pad_template(cls, "audio_sink");
+        if (templ)
+            sink_pad = gst_element_request_pad(vo->playsink, templ, NULL, NULL);
     }
     else if (g_str_has_prefix(new_pad_type, "video")) {
-        templ = gst_element_class_get_pad_template(cls, "video_sink");
+/*        cls = GST_ELEMENT_GET_CLASS(vo->cairooverlay);
+        templ = gst_element_class_get_pad_template(cls, "sink");
+        if (templ)
+            sink_pad = gst_element_request_pad(vo->cairooverlay, templ, NULL, NULL);*/
+        sink_pad = gst_element_get_static_pad(vo->videoconvert[0], "sink");
+
     }
 
-    if (templ) {
-        sink_pad = gst_element_request_pad(vo->playsink, templ, NULL, NULL);
-
+    if (sink_pad) {
         if (gst_pad_is_linked(sink_pad)) {
             g_print("Already linked\n");
             goto done;
@@ -396,6 +407,9 @@ static void video_output_pad_added_handler(GstElement *src, GstPad *new_pad, Vid
             g_print("Linking failed\n");
         else
             g_print("Linkings successful\n");
+    }
+    else {
+        g_printerr("could not get sink pad (templ: %p)\n", templ);
     }
 
 done:
@@ -478,6 +492,26 @@ static void video_output_gst_message(GstBus *bus, GstMessage *msg, VideoOutput *
     fprintf(stderr, "message from %s: %s\n", GST_OBJECT_NAME(msg->src), gst_message_type_get_name(msg->type));
 }
 
+static void video_output_cairo_caps_changed(GstElement *overlay, GstCaps *caps, VideoOutput *vo)
+{
+    vo->videoinfo_valid  = !!gst_video_info_from_caps(&vo->videoinfo, caps);
+}
+
+static void video_output_cairo_draw(GstElement *overlay, cairo_t *cr, guint64 timestamp, guint64 duration, VideoOutput *vo)
+{
+    double scale = 1.0f;
+    int width, height;
+
+    if (vo->videoinfo_valid == 0)
+        return;
+    width = GST_VIDEO_INFO_WIDTH(&vo->videoinfo);
+    height = GST_VIDEO_INFO_HEIGHT(&vo->videoinfo);
+
+    cairo_set_source_rgba(cr, 1.0, 0.0, 0.0, 0.8);
+    cairo_rectangle(cr, 0, 0, 20, 20);
+    cairo_fill(cr);
+}
+
 void video_output_setup_pipeline(VideoOutput *vo)
 {
     fprintf(stderr, "video_output_setup_pipeline: %p\n", vo->pipeline);
@@ -506,8 +540,19 @@ void video_output_setup_pipeline(VideoOutput *vo)
     GstElement *source = gst_element_factory_make("fdsrc", "fdsrc");
     fprintf(stderr, "fdsrc: %d\n", vo->infile);
     g_object_set(G_OBJECT(source), "fd", vo->infile, NULL);
-/*    GstElement *source = gst_element_factory_make("filesrc", "filesrc");
-    g_object_set(G_OBJECT(source), "location", "/tmp/ts-dummy.ts", NULL);*/
+
+    /* check if textoverlay/textrender suffices and we can get rid of videoconvert */
+    vo->cairooverlay = gst_element_factory_make("cairooverlay", "cairooverlay");
+    /* videoconvert was ffmpegcolorspace before 1.0 */
+    vo->videoconvert[0] = gst_element_factory_make("videoconvert", "videoconvert0");
+    vo->videoconvert[1] = gst_element_factory_make("videoconvert", "videoconvert1");
+    if (!vo->cairooverlay || !vo->videoconvert[0] || !vo->videoconvert[1])
+        fprintf(stderr, "cairooverlay: %p, videoconvert: %p, colorspace: %p\n",
+                vo->cairooverlay, vo->videoconvert[0], vo->videoconvert[1]);
+    g_signal_connect(G_OBJECT(vo->cairooverlay), "draw",
+            G_CALLBACK(video_output_cairo_draw), vo);
+    g_signal_connect(G_OBJECT(vo->cairooverlay), "caps-changed",
+            G_CALLBACK(video_output_cairo_caps_changed), vo);
 
 #if GST_CHECK_VERSION(1, 0, 0)
     GstElement *decoder = gst_element_factory_make("decodebin", "decodebin");
@@ -521,9 +566,27 @@ void video_output_setup_pipeline(VideoOutput *vo)
 
     fprintf(stderr, "pipeline: %p, source: %p, decoder: %p\n",
             vo->pipeline, source, decoder);
-    gst_bin_add_many(GST_BIN(vo->pipeline), source, decoder, vo->playsink, NULL);
+    gst_bin_add_many(GST_BIN(vo->pipeline), source, decoder, vo->videoconvert[0], vo->cairooverlay,
+            vo->videoconvert[1], vo->playsink, NULL);
     if (!gst_element_link(source, decoder)) {
         g_printerr("Elements could not be linked. (source -> decoder)\n");
+    }
+    if (!gst_element_link_many(vo->videoconvert[0], vo->cairooverlay, vo->videoconvert[1], NULL)) {
+        g_printerr("Elements could not be linked. (videoconvert[0] -> cairooverlay -> videoconvert[1])\n");
+    }
+
+    GstPad *playsink_video_pad = gst_element_get_request_pad(vo->playsink, "video_sink");
+    GstPad *videoconvert_pad = gst_element_get_static_pad(vo->videoconvert[1], "src");
+    GstPadLinkReturn ret;
+    if (playsink_video_pad && videoconvert_pad) {
+        ret = gst_pad_link(videoconvert_pad, playsink_video_pad);
+        if (GST_PAD_LINK_FAILED(ret))
+            g_print("Linking convert -> playsink failed\n");
+        else
+            g_print("Linking successful\n");
+    }
+    else {
+        g_printerr("Could not request video pad or convert pad: %p, %p\n", playsink_video_pad, videoconvert_pad);
     }
 
     GstBus *bus = gst_element_get_bus(GST_ELEMENT(vo->pipeline));
