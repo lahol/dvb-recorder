@@ -740,6 +740,7 @@ int main(int argc, char **argv)
 
     status_save(&appstatus, status_file);
 
+    osd_cleanup(appdata.osd);
     fprintf(stderr, "destroying video\n");
     video_output_destroy(appdata.video_output);
     fprintf(stderr, "destroying recorder\n");

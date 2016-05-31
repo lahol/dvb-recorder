@@ -30,6 +30,7 @@ void osd_cleanup(OSD *osd)
         g_timer_destroy(osd->hide_osd_timer);
     if (osd->hide_osd_source)
         g_source_remove(osd->hide_osd_source);
+    g_free(osd);
 }
 
 gboolean osd_check_timer_elapsed(OSD *osd)
@@ -52,7 +53,7 @@ void osd_update_channel_display(OSD *osd, guint timeout)
     g_return_if_fail(osd != NULL);
 
     DVBStreamInfo *info = dvb_recorder_get_stream_info(osd->recorder);
-    fprintf(stderr, "stream info: %p\n");
+    fprintf(stderr, "stream info: %p\n", info);
     if (!info)
         return;
 
@@ -90,8 +91,9 @@ void osd_update_channel_display(OSD *osd, guint timeout)
     cairo_set_line_width(cr, 1.0);
     cairo_stroke(cr);
 
-
     cairo_destroy(cr);
+
+    dvb_stream_info_free(info);
 
     video_output_set_overlay_surface(osd->vo, surf);
 
@@ -109,4 +111,5 @@ err:
         cairo_destroy(cr);
     if (surf)
         cairo_surface_destroy(surf);
+    dvb_stream_info_free(info);
 }
