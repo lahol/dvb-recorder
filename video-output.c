@@ -37,9 +37,14 @@ struct _VideoOutput {
     GstElement *videoconvert[2];
     GstVideoInfo videoinfo;
 
+    cairo_surface_t *overlay_surface;
+
     GThread *thread;
     GMutex pipeline_mutex;
     GMutex infile_mutex;
+
+    VIDEOOUTPUTEVENTCALLBACK event_cb;
+    gpointer event_data;
 
     gdouble volume;
     uint32_t write_error : 1;
@@ -51,7 +56,7 @@ void video_output_setup_pipeline(VideoOutput *vo);
 void video_output_clear_pipeline(VideoOutput *vo);
 gpointer video_output_thread_proc(VideoOutput *vo);
 
-VideoOutput *video_output_new(GtkWidget *drawing_area)
+VideoOutput *video_output_new(GtkWidget *drawing_area, VIDEOOUTPUTEVENTCALLBACK event_cb, gpointer event_data)
 {
     VideoOutput *vo = g_malloc0(sizeof(VideoOutput));
 
@@ -68,6 +73,9 @@ VideoOutput *video_output_new(GtkWidget *drawing_area)
 
     g_mutex_init(&vo->pipeline_mutex);
     g_mutex_init(&vo->infile_mutex);
+
+    vo->event_cb = event_cb;
+    vo->event_data = event_data;
 
     return vo;
 }
@@ -480,6 +488,23 @@ static void video_output_gst_state_changed_cb(GstBus *bus, GstMessage *msg, Vide
                 gst_element_state_get_name(new_state),
                 gst_element_state_get_name(pending_state));
     }
+
+    /* pipeline is ready when we are in paused or playing, obviously */
+    if (vo->event_cb) {
+        switch (new_state) {
+            case GST_STATE_READY:
+                vo->event_cb(vo, VIDEO_OUTPUT_EVENT_READY, vo->event_data);
+                break;
+            case GST_STATE_PAUSED:
+                vo->event_cb(vo, VIDEO_OUTPUT_EVENT_PAUSED, vo->event_data);
+                break;
+            case GST_STATE_PLAYING:
+                vo->event_cb(vo, VIDEO_OUTPUT_EVENT_PLAYING, vo->event_data);
+                break;
+            default:
+                break;
+        }
+    }
 }
 
 static void video_output_gst_message(GstBus *bus, GstMessage *msg, VideoOutput *vo)
@@ -502,12 +527,42 @@ static void video_output_cairo_draw(GstElement *overlay, cairo_t *cr, guint64 ti
     width = GST_VIDEO_INFO_WIDTH(&vo->videoinfo);
     height = GST_VIDEO_INFO_HEIGHT(&vo->videoinfo);
 
-    double pixel_aspect_inv = ((double)vo->videoinfo.par_d)/((double)vo->videoinfo.par_n);
+/*    double pixel_aspect_inv = ((double)vo->videoinfo.par_d)/((double)vo->videoinfo.par_n);
 
     cairo_scale(cr, pixel_aspect_inv, 1.0f);
-    cairo_set_source_rgba(cr, 1.0, 0.0, 0.0, 0.7);
-    cairo_rectangle(cr, 0, 0, 40, 40);
-    cairo_fill(cr);
+    cairo_set_source_rgba(cr, 1.0, 0.0, 0.0, 0.7);*/
+    if (vo->overlay_surface) {
+        cairo_rectangle(cr, 0, 0, width, height);
+        cairo_set_source_surface(cr, vo->overlay_surface, 0, 0);
+        cairo_paint(cr);
+    }
+}
+
+gboolean video_output_get_overlay_surface_parameters(VideoOutput *vo, gint *width, gint *height, gdouble *pixel_aspect)
+{
+    g_return_val_if_fail(vo != NULL, FALSE);
+
+    if (vo->videoinfo_valid == 0)
+        return FALSE;
+
+    if (width)
+        *width = GST_VIDEO_INFO_WIDTH(&vo->videoinfo);
+    if (height)
+        *height = GST_VIDEO_INFO_HEIGHT(&vo->videoinfo);
+    if (pixel_aspect)
+        *pixel_aspect = ((gdouble)vo->videoinfo.par_n)/((gdouble)vo->videoinfo.par_d);
+
+    return TRUE;
+}
+
+void video_output_set_overlay_surface(VideoOutput *vo, cairo_surface_t *overlay)
+{
+    if (vo->overlay_surface) {
+        cairo_surface_destroy(vo->overlay_surface);
+        vo->overlay_surface = NULL;
+    }
+
+    vo->overlay_surface = overlay;
 }
 
 void video_output_setup_pipeline(VideoOutput *vo)

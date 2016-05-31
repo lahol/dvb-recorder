@@ -17,6 +17,7 @@
 #include "config.h"
 #include "status.h"
 #include "ui-epg-list.h"
+#include "osd.h"
 
 struct {
     GtkWidget *main_window;
@@ -41,7 +42,11 @@ struct {
 struct {
     VideoOutput *video_output;
     DVBRecorder *recorder;
+    OSD *osd;
     guint32 is_recording : 1;
+    guint32 is_video_ready : 1;
+    guint32 is_sdt_ready : 1;
+    guint32 notified_channel_change : 1;
 } appdata;
 
 AppStatus appstatus;
@@ -555,6 +560,27 @@ void _dump_event(EPGEvent *event)
     fprintf(stderr, "\n");
 }
 
+void main_notify_channel_change(void)
+{
+    if (!appdata.notified_channel_change && appdata.is_sdt_ready && appdata.is_video_ready) {
+        osd_update_channel_display(appdata.osd, 3);
+        appdata.notified_channel_change = 1;
+    }
+}
+
+void main_video_output_event_callback(VideoOutput *video_output, VideoOutputEventType event, gpointer userdata)
+{
+    switch (event) {
+        case VIDEO_OUTPUT_EVENT_PLAYING:
+            fprintf(stderr, "video output playing\n");
+            appdata.is_video_ready = 1;
+            main_notify_channel_change();
+            break;
+        default:
+            break;
+    }
+}
+
 void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
 {
     switch (event->type) {
@@ -591,6 +617,9 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
                 case DVB_STREAM_STATUS_STOPPED:
                     fprintf(stderr, "dvb-recorder: stopped\n");
                     video_output_set_infile(appdata.video_output, -1);
+                    appdata.is_sdt_ready = 0;
+                    appdata.is_video_ready = 0;
+                    appdata.notified_channel_change = 0;
                     break;
                 case DVB_STREAM_STATUS_RUNNING:
                     fprintf(stderr, "dvb-recorder: running\n");
@@ -610,6 +639,11 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
 
                 g_list_free(events);
             }
+            break;
+        case DVB_RECORDER_EVENT_SDT_CHANGED:
+            fprintf(stderr, "SDT changed\n");
+            appdata.is_sdt_ready = 1;
+            main_notify_channel_change();
             break;
         default:
             break;
@@ -677,11 +711,13 @@ int main(int argc, char **argv)
 
     gtk_window_present(GTK_WINDOW(widgets.main_window));
 
-    appdata.video_output = video_output_new(widgets.drawing_area);
+    appdata.video_output = video_output_new(widgets.drawing_area, main_video_output_event_callback, NULL);
 
     int fd = dvb_recorder_enable_video_source(appdata.recorder, TRUE);
     fprintf(stderr, "recorder video source: %d\n", fd);
     video_output_set_infile(appdata.video_output, fd);
+
+    appdata.osd = osd_new(appdata.recorder, appdata.video_output);
 
     if (!appstatus.recorder.initialized) {
         appstatus.recorder.initialized = 1;
