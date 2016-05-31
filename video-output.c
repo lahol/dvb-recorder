@@ -37,8 +37,6 @@ struct _VideoOutput {
     GstElement *videoconvert[2];
     GstVideoInfo videoinfo;
 
-    double pixel_aspect_inv;
-
     GThread *thread;
     GMutex pipeline_mutex;
     GMutex infile_mutex;
@@ -67,8 +65,6 @@ VideoOutput *video_output_new(GtkWidget *drawing_area)
     vo->communication_pipe[1] = -1;
 
     vo->volume = 1.0;
-
-    vo->pixel_aspect_inv = 1.0;
 
     g_mutex_init(&vo->pipeline_mutex);
     g_mutex_init(&vo->infile_mutex);
@@ -392,22 +388,7 @@ static void video_output_pad_added_handler(GstElement *src, GstPad *new_pad, Vid
             sink_pad = gst_element_request_pad(vo->playsink, templ, NULL, NULL);
     }
     else if (g_str_has_prefix(new_pad_type, "video")) {
-        GValue *pixelaspect = gst_structure_get_value(new_pad_struct, "pixel-aspect-ratio");
-        if (GST_VALUE_HOLDS_FRACTION(pixelaspect)) {
-            vo->pixel_aspect_inv = ((double)gst_value_get_fraction_denominator(pixelaspect))
-                                 / ((double)gst_value_get_fraction_numerator(pixelaspect));
-            fprintf(stderr, "pixelaspectinv: %f\n", vo->pixel_aspect_inv);
-        }
-        else {
-            vo->pixel_aspect_inv = 1.0f;
-        }
-
-/*        cls = GST_ELEMENT_GET_CLASS(vo->cairooverlay);
-        templ = gst_element_class_get_pad_template(cls, "sink");
-        if (templ)
-            sink_pad = gst_element_request_pad(vo->cairooverlay, templ, NULL, NULL);*/
         sink_pad = gst_element_get_static_pad(vo->videoconvert[0], "sink");
-
     }
 
     if (sink_pad) {
@@ -521,7 +502,9 @@ static void video_output_cairo_draw(GstElement *overlay, cairo_t *cr, guint64 ti
     width = GST_VIDEO_INFO_WIDTH(&vo->videoinfo);
     height = GST_VIDEO_INFO_HEIGHT(&vo->videoinfo);
 
-    cairo_scale(cr, vo->pixel_aspect_inv, 1.0f);
+    double pixel_aspect_inv = ((double)vo->videoinfo.par_d)/((double)vo->videoinfo.par_n);
+
+    cairo_scale(cr, pixel_aspect_inv, 1.0f);
     cairo_set_source_rgba(cr, 1.0, 0.0, 0.0, 0.7);
     cairo_rectangle(cr, 0, 0, 40, 40);
     cairo_fill(cr);
