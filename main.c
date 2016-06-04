@@ -13,6 +13,7 @@
 
 #include "ui-sidebar-dvb.h"
 #include "favourites-dialog.h"
+#include "ui-recorder-settings-dialog.h"
 
 #include "config.h"
 #include "status.h"
@@ -26,6 +27,7 @@ struct {
     GtkWidget *channel_list;
     GtkWidget *epg_dialog;
     GtkWidget *epg_list;
+    GtkWidget *control_dialog;
 
     struct {
         GtkWidget *record;
@@ -95,12 +97,14 @@ void main_window_status_set_fullscreen(gboolean fullscreen)
     if (fullscreen) {
         main_window_status_set_visible(widgets.channels_dialog, &appstatus.gui.channels_dialog, FALSE);
         main_window_status_set_visible(widgets.epg_dialog, &appstatus.gui.epg_dialog, FALSE);
+        main_window_status_set_visible(widgets.control_dialog, &appstatus.gui.control_dialog, FALSE);
         gtk_window_fullscreen(GTK_WINDOW(widgets.main_window));
         appstatus.gui.main_window.fullscreen = 1;
     }
     else {
         main_window_status_set_visible(widgets.channels_dialog, &appstatus.gui.channels_dialog, TRUE);
         main_window_status_set_visible(widgets.epg_dialog, &appstatus.gui.epg_dialog, TRUE);
+        main_window_status_set_visible(widgets.control_dialog, &appstatus.gui.control_dialog, TRUE);
         gtk_window_unfullscreen(GTK_WINDOW(widgets.main_window));
         appstatus.gui.main_window.fullscreen = 0;
     }
@@ -308,6 +312,11 @@ void main_menu_show_epg_dialog(gpointer userdata)
     main_window_status_toggle_show(widgets.epg_dialog, &appstatus.gui.epg_dialog);
 }
 
+void main_menu_show_control_dialog(gpointer userdata)
+{
+    main_window_status_toggle_show(widgets.control_dialog, &appstatus.gui.control_dialog);
+}
+
 void main_menu_quit(gpointer userdata)
 {
     fprintf(stderr, "Menu > Quit\n");
@@ -316,9 +325,14 @@ void main_menu_quit(gpointer userdata)
 
 void main_menu_show_favourites_dialog(void)
 {
-    favourites_dialog_show(widgets.channels_dialog,
+    favourites_dialog_show(widgets.main_window,
             (CHANNEL_FAVOURITES_DIALOG_UPDATE_NOTIFY)ui_sidebar_channels_update_favourites,
             widgets.channel_list);
+}
+
+void main_menu_show_recorder_settings_dialog(void)
+{
+    ui_recorder_settings_dialog_show(widgets.main_window, appdata.recorder);
 }
 
 void _main_add_accelerator(GtkWidget *item, const gchar *accel_signal, GtkAccelGroup *accel_group,
@@ -337,6 +351,11 @@ GtkWidget *main_create_context_menu(void)
     GtkWidget *item;
 
     /* FIXME: check menu item */
+    item = gtk_menu_item_new_with_label(_("Show controls"));
+    g_signal_connect_swapped(G_OBJECT(item), "activate",
+            G_CALLBACK(main_menu_show_control_dialog), NULL);
+    gtk_menu_shell_append(GTK_MENU_SHELL(popup), item);
+
     item = gtk_menu_item_new_with_label(_("Show channels"));
     g_signal_connect_swapped(G_OBJECT(item), "activate",
             G_CALLBACK(main_menu_show_channels_dialog), NULL);
@@ -350,6 +369,11 @@ GtkWidget *main_create_context_menu(void)
     item = gtk_menu_item_new_with_label(_("Edit channel lists"));
     g_signal_connect_swapped(G_OBJECT(item), "activate",
             G_CALLBACK(main_menu_show_favourites_dialog), NULL);
+    gtk_menu_shell_append(GTK_MENU_SHELL(popup), item);
+
+    item = gtk_menu_item_new_with_label(_("Edit recorder settings"));
+    g_signal_connect_swapped(G_OBJECT(item), "activate",
+            G_CALLBACK(main_menu_show_recorder_settings_dialog), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(popup), item);
 
     item = gtk_separator_menu_item_new();
@@ -375,6 +399,11 @@ GtkWidget *main_create_main_menu(void)
     item = gtk_menu_item_new_with_label(_("Edit channel lists"));
     g_signal_connect_swapped(G_OBJECT(item), "activate",
             G_CALLBACK(main_menu_show_favourites_dialog), NULL);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+
+    item = gtk_menu_item_new_with_label(_("Edit recorder settings"));
+    g_signal_connect_swapped(G_OBJECT(item), "activate",
+            G_CALLBACK(main_menu_show_recorder_settings_dialog), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
 
     item = gtk_separator_menu_item_new();
@@ -464,6 +493,17 @@ GtkWidget *main_init_channels_dialog_buttons(void)
     return hbox;
 }
 
+void main_position_dialog(GtkWidget *dialog, GuiWindowStatus *status, gint default_width, gint default_height)
+{
+    if (status->initialized) {
+        gtk_window_move(GTK_WINDOW(dialog), status->x, status->y);
+        gtk_window_set_default_size(GTK_WINDOW(dialog), status->width, status->height);
+    }
+    else {
+        gtk_window_set_default_size(GTK_WINDOW(dialog), default_width, default_height);
+    }
+}
+
 void main_init_channels_dialog(void)
 {
     widgets.channels_dialog = gtk_dialog_new();
@@ -471,12 +511,6 @@ void main_init_channels_dialog(void)
             G_CALLBACK(main_window_status_configure_event), &appstatus.gui.channels_dialog);
     gtk_window_set_transient_for(GTK_WINDOW(widgets.channels_dialog), GTK_WINDOW(widgets.main_window));
     GtkWidget *content = gtk_dialog_get_content_area(GTK_DIALOG(widgets.channels_dialog));
-
-    GtkWidget *menu_bar = main_create_main_menu();
-    gtk_box_pack_start(GTK_BOX(content), menu_bar, FALSE, FALSE, 0);
-
-    GtkWidget *button_bar = main_init_channels_dialog_buttons();
-    gtk_box_pack_start(GTK_BOX(content), button_bar, FALSE, FALSE, 0);
 
 /*    GtkWidget *entry = gtk_entry_new();
     gtk_box_pack_start(GTK_BOX(content), entry, TRUE, TRUE, 0);*/
@@ -489,15 +523,7 @@ void main_init_channels_dialog(void)
 
     gtk_window_add_accel_group(GTK_WINDOW(widgets.channels_dialog), widgets.accelerator_group);
 
-    if (appstatus.gui.channels_dialog.initialized) {
-        gtk_window_move(GTK_WINDOW(widgets.channels_dialog),
-                appstatus.gui.channels_dialog.x, appstatus.gui.channels_dialog.y);
-        gtk_window_set_default_size(GTK_WINDOW(widgets.channels_dialog),
-                appstatus.gui.channels_dialog.width, appstatus.gui.channels_dialog.height);
-    }
-    else {
-        gtk_window_set_default_size(GTK_WINDOW(widgets.channels_dialog), 200, 400);
-    }
+    main_position_dialog(widgets.channels_dialog, &appstatus.gui.channels_dialog, 200, 400);
     
     gtk_widget_show_all(widgets.channels_dialog);
 }
@@ -514,16 +540,28 @@ void main_init_epg_dialog(void)
     
     gtk_box_pack_start(GTK_BOX(content), widgets.epg_list, TRUE, TRUE, 0);
 
-    if (appstatus.gui.epg_dialog.initialized) {
-        gtk_window_move(GTK_WINDOW(widgets.epg_dialog),
-                appstatus.gui.epg_dialog.x, appstatus.gui.epg_dialog.y);
-        gtk_window_set_default_size(GTK_WINDOW(widgets.epg_dialog),
-                appstatus.gui.epg_dialog.width, appstatus.gui.epg_dialog.height);
-    }
-    else
-        gtk_window_set_default_size(GTK_WINDOW(widgets.epg_dialog), 400, 300);
+    main_position_dialog(widgets.epg_dialog, &appstatus.gui.epg_dialog, 400, 300);
 
     gtk_widget_show_all(widgets.epg_dialog);
+}
+
+void main_init_control_dialog(void)
+{
+    widgets.control_dialog = gtk_dialog_new();
+    g_signal_connect(G_OBJECT(widgets.control_dialog), "configure-event",
+            G_CALLBACK(main_window_status_configure_event), &appstatus.gui.control_dialog);
+    gtk_window_set_transient_for(GTK_WINDOW(widgets.control_dialog), GTK_WINDOW(widgets.main_window));
+    GtkWidget *content = gtk_dialog_get_content_area(GTK_DIALOG(widgets.control_dialog));
+
+    GtkWidget *menu_bar = main_create_main_menu();
+    gtk_box_pack_start(GTK_BOX(content), menu_bar, FALSE, FALSE, 0);
+
+    GtkWidget *button_bar = main_init_channels_dialog_buttons();
+    gtk_box_pack_start(GTK_BOX(content), button_bar, FALSE, FALSE, 0);
+
+    main_position_dialog(widgets.control_dialog, &appstatus.gui.control_dialog, 130, 60);
+
+    gtk_widget_show_all(widgets.control_dialog);
 }
 
 void main_recorder_channel_selected_cb(UiSidebarChannels *sidebar, guint channel_id, gpointer userdata)
@@ -692,7 +730,14 @@ int main(int argc, char **argv)
         dvb_recorder_set_record_filename_pattern(appdata.recorder, "capture-${service_name}-${program_name}-${date:%Y%m%d-%H%M%S}.ts");
     }
 
+    gint ival;
+    if (config_get("dvb", "record-streams", CFG_TYPE_INT, &ival) == 0) {
+        fprintf(stderr, "record streams from config: 0x%x\n", ival);
+        dvb_recorder_set_record_filter(appdata.recorder, ival);
+    }
+
     main_init_window();
+    main_init_control_dialog();
     main_init_channels_dialog();
     main_init_epg_dialog();
     ui_epg_list_set_recorder_handle(UI_EPG_LIST(widgets.epg_list), appdata.recorder);
@@ -701,6 +746,9 @@ int main(int argc, char **argv)
             appstatus.gui.main_window.fullscreen)
         main_window_status_set_fullscreen(TRUE);
 
+    if (appstatus.gui.control_dialog.initialized)
+        main_window_status_set_show(widgets.control_dialog, &appstatus.gui.control_dialog,
+                                    appstatus.gui.control_dialog.show_window);
     if (appstatus.gui.channels_dialog.initialized)
         main_window_status_set_show(widgets.channels_dialog, &appstatus.gui.channels_dialog,
                                     appstatus.gui.channels_dialog.show_window);

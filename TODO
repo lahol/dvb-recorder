@@ -3,21 +3,22 @@
  ✔ display EIT
  ✔ format string for custom record output (partially done)
  * format output directory for record
- * select tables for recording
+ ✔ select tables for recording
+ * save table selection (status/config?)
  * hide mouse cursor in fullscreen mode
- ? BUG: channel switching (requires two activations)
+ ✔ BUG: channel switching (requires two activations) (notify stream stop -> close pipeline)
  ✔ (custom) sort channel list
  ✔ delete entry in favourites list
  * adapt window size to content
  ✔ restore focus after unfullscreen
- * move record/snapshot button to own dialog (together with table settings)
+ ✔ move record/snapshot button to own dialog (together with table settings)
  * subtitles
  ✔ [lib] retrieve current program (from eit 0x4e, maybe take next program if it starts in a few seconds)
  * scheduled recording
  * configure resume channel
  * configure adapt window size to content
  * teletext
- * osd (subtitles, change of program, status)
+ ✔ osd (subtitles, change of program, status)
  * configure keyboard shortcuts
  * handle multiple audio
  * select audio channel
