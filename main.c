@@ -572,7 +572,6 @@ void main_video_output_event_callback(VideoOutput *video_output, VideoOutputEven
 {
     switch (event) {
         case VIDEO_OUTPUT_EVENT_PLAYING:
-            fprintf(stderr, "video output playing\n");
             appdata.is_video_ready = 1;
             main_notify_channel_change();
             break;
