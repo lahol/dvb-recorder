@@ -49,6 +49,10 @@ struct {
     guint32 is_video_ready : 1;
     guint32 is_sdt_ready : 1;
     guint32 notified_channel_change : 1;
+
+    guint hide_cursor_source;
+    GTimer *hide_cursor_timer;
+    GdkCursor *blank_cursor;
 } appdata;
 
 AppStatus appstatus;
@@ -92,6 +96,37 @@ void main_window_status_toggle_show(GtkWidget *window, GuiWindowStatus *status)
     main_window_status_set_show(window, status, !status->show_window || !status->is_visible);
 }
 
+gboolean main_check_mouse_motion(gpointer data)
+{
+    if (!appdata.blank_cursor)
+        appdata.blank_cursor = gdk_cursor_new_from_name(gdk_display_get_default(), "none");
+    if (!appstatus.gui.main_window.fullscreen) {
+        gdk_window_set_cursor(gtk_widget_get_window(widgets.main_window), NULL);
+        return FALSE;
+    }
+    gdouble elapsed = g_timer_elapsed(appdata.hide_cursor_timer, NULL);
+    if (elapsed > 3) {
+        g_timer_stop(appdata.hide_cursor_timer);
+        g_timer_destroy(appdata.hide_cursor_timer);
+        appdata.hide_cursor_timer = NULL;
+        appdata.hide_cursor_source = 0;
+        gdk_window_set_cursor(gtk_widget_get_window(widgets.main_window), appdata.blank_cursor);
+        return FALSE;
+    }
+    return TRUE;
+}
+
+gboolean main_handle_motion_event(GtkWidget *widget, GdkEventMotion *event, gpointer data)
+{
+    gdk_window_set_cursor(gtk_widget_get_window(widget), NULL);
+    if (!appdata.hide_cursor_timer)
+        appdata.hide_cursor_timer = g_timer_new();
+    g_timer_start(appdata.hide_cursor_timer);
+    if (!appdata.hide_cursor_source)
+        appdata.hide_cursor_source = g_idle_add(main_check_mouse_motion, NULL);
+    return FALSE;
+}
+
 void main_window_status_set_fullscreen(gboolean fullscreen)
 {
     if (fullscreen) {
@@ -100,6 +135,10 @@ void main_window_status_set_fullscreen(gboolean fullscreen)
         main_window_status_set_visible(widgets.control_dialog, &appstatus.gui.control_dialog, FALSE);
         gtk_window_fullscreen(GTK_WINDOW(widgets.main_window));
         appstatus.gui.main_window.fullscreen = 1;
+
+        appdata.hide_cursor_timer = g_timer_new();
+        g_timer_start(appdata.hide_cursor_timer);
+        appdata.hide_cursor_source = g_idle_add(main_check_mouse_motion, NULL);
     }
     else {
         main_window_status_set_visible(widgets.channels_dialog, &appstatus.gui.channels_dialog, TRUE);
@@ -107,6 +146,8 @@ void main_window_status_set_fullscreen(gboolean fullscreen)
         main_window_status_set_visible(widgets.control_dialog, &appstatus.gui.control_dialog, TRUE);
         gtk_window_unfullscreen(GTK_WINDOW(widgets.main_window));
         appstatus.gui.main_window.fullscreen = 0;
+
+        gdk_window_set_cursor(gtk_widget_get_window(widgets.main_window), NULL);
     }
 
     /* focus main window */
@@ -437,9 +478,11 @@ void main_init_window(void)
             G_CALLBACK(main_button_event), NULL);
     g_signal_connect(G_OBJECT(widgets.main_window), "configure-event",
             G_CALLBACK(main_window_status_configure_event), &appstatus.gui.main_window);
+    g_signal_connect(G_OBJECT(widgets.main_window), "motion-notify-event",
+            G_CALLBACK(main_handle_motion_event), NULL);
 
     widgets.drawing_area = gtk_drawing_area_new();
-    gtk_widget_add_events(widgets.drawing_area, GDK_KEY_PRESS_MASK | GDK_KEY_RELEASE_MASK);
+    gtk_widget_add_events(widgets.drawing_area, GDK_KEY_PRESS_MASK | GDK_KEY_RELEASE_MASK | GDK_POINTER_MOTION_MASK);
 
     g_signal_connect(G_OBJECT(widgets.drawing_area), "size-allocate",
             G_CALLBACK(main_drawing_area_size_allocate), NULL);
@@ -802,6 +845,13 @@ int main(int argc, char **argv)
     g_free(config);
 
     config_free();
+
+    if (appdata.hide_cursor_timer)
+        g_timer_destroy(appdata.hide_cursor_timer);
+    if (appdata.hide_cursor_source)
+        g_source_remove(appdata.hide_cursor_source);
+    if (appdata.blank_cursor)
+        g_object_unref(G_OBJECT(appdata.blank_cursor));
 
     fprintf(stderr, "done\n");
     return 0;

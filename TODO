@@ -5,7 +5,7 @@
  * format output directory for record
  ✔ select tables for recording
  ✔ save table selection (status/config?)
- * hide mouse cursor in fullscreen mode
+ ✔ hide mouse cursor in fullscreen mode
  ✔ BUG: channel switching (requires two activations) (notify stream stop -> close pipeline)
  ✔ (custom) sort channel list
  ✔ delete entry in favourites list
