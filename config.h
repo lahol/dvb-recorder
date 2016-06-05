@@ -9,5 +9,7 @@ typedef enum {
 
 gint config_read_cmdline(int *pargc, char ***pargv);
 gint config_load(gchar *conffile);
+gint config_save(gchar *conffile);
 void config_free(void);
 gint config_get(gchar *group, gchar *key, CfgType type, gpointer value);
+void config_set(gchar *group, gchar *key, CfgType type, gpointer value);

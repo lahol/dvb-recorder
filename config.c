@@ -23,6 +23,11 @@ gint config_load(gchar *conffile)
     return 0;
 }
 
+gint config_save(gchar *conffile)
+{
+    return g_key_file_save_to_file(_config_keyfile, conffile, NULL) ? 0 : 1;
+}
+
 void config_free(void)
 {
     g_key_file_free(_config_keyfile);
@@ -48,3 +53,16 @@ gint config_get(gchar *group, gchar *key, CfgType type, gpointer value)
     }
     return 0;
 }
+
+void config_set(gchar *group, gchar *key, CfgType type, gpointer value)
+{
+    switch (type) {
+        case CFG_TYPE_STRING:
+            g_key_file_set_string(_config_keyfile, group, key, (const gchar *)value);
+            break;
+        case CFG_TYPE_INT:
+            g_key_file_set_integer(_config_keyfile, group, key, GPOINTER_TO_INT(value));
+            break;
+    }
+}
+

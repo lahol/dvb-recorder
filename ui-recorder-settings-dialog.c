@@ -2,6 +2,7 @@
 #include <glib/gi18n.h>
 #include <glib/gprintf.h>
 #include <dvbrecorder/filter.h>
+#include "config.h"
 
 enum {
     FILTER_CHECK_VIDEO = 0,
@@ -228,6 +229,8 @@ void ui_recorder_settings_dialog_show(GtkWidget *parent, DVBRecorder *recorder)
 
     if (result == GTK_RESPONSE_APPLY) {
         ui_recorder_settings_dialog_set_recorder_filter(UI_RECORDER_SETTINGS_DIALOG(dialog));
+        config_set("dvb", "record-streams", CFG_TYPE_INT,
+                GINT_TO_POINTER(dvb_recorder_get_record_filter(recorder)));
     }
 
     fprintf(stderr, "destroying\n");

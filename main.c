@@ -793,6 +793,14 @@ int main(int argc, char **argv)
     fprintf(stderr, "destroying recorder\n");
     dvb_recorder_destroy(appdata.recorder);
 
+    config = g_build_filename(
+            g_get_user_config_dir(),
+            "dvb-recorder",
+            "config",
+            NULL);
+    config_save(config);
+    g_free(config);
+
     config_free();
 
     fprintf(stderr, "done\n");
