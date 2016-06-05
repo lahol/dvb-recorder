@@ -158,6 +158,7 @@ static void populate_widget(UiDialogScan *self)
     gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(self->priv->satellite_combo), "S23E5", "Astra S23.5E");
     gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(self->priv->satellite_combo), "S13E0", "Hotbird S13.0E");
     gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(self->priv->satellite_combo), "S28E2", "Astra S28.2E");
+    gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(self->priv->satellite_combo), "S9E0", "Eurobird 9");
 
     gtk_box_pack_start(GTK_BOX(hbox), self->priv->satellite_combo, TRUE, TRUE, 3);
 
