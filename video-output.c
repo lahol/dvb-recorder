@@ -34,10 +34,9 @@ struct _VideoOutput {
     GstElement *vsink;
     GstElement *playsink;
     GstElement *cairooverlay;
-    GstElement *videoconvert[2];
-    GstVideoInfo videoinfo;
-
-    cairo_surface_t *overlay_surface;
+    guint width;
+    guint height;
+    gdouble pixel_aspect;
 
     GThread *thread;
     GMutex pipeline_mutex;
@@ -396,7 +395,7 @@ static void video_output_pad_added_handler(GstElement *src, GstPad *new_pad, Vid
             sink_pad = gst_element_request_pad(vo->playsink, templ, NULL, NULL);
     }
     else if (g_str_has_prefix(new_pad_type, "video")) {
-        sink_pad = gst_element_get_static_pad(vo->videoconvert[0], "sink");
+        sink_pad = gst_element_get_static_pad(vo->cairooverlay, "sink");
     }
 
     if (sink_pad) {
@@ -512,30 +511,12 @@ static void video_output_gst_message(GstBus *bus, GstMessage *msg, VideoOutput *
     fprintf(stderr, "message from %s: %s\n", GST_OBJECT_NAME(msg->src), gst_message_type_get_name(msg->type));
 }
 
-static void video_output_cairo_caps_changed(GstElement *overlay, GstCaps *caps, VideoOutput *vo)
+static void video_output_cairo_info_changed(GstElement *overlay, guint width, guint height, gdouble pixel_aspect, VideoOutput *vo)
 {
-    vo->videoinfo_valid  = !!gst_video_info_from_caps(&vo->videoinfo, caps);
-}
-
-static void video_output_cairo_draw(GstElement *overlay, cairo_t *cr, guint64 timestamp, guint64 duration, VideoOutput *vo)
-{
-    double scale = 1.0f;
-    int width, height;
-
-    if (vo->videoinfo_valid == 0)
-        return;
-    width = GST_VIDEO_INFO_WIDTH(&vo->videoinfo);
-    height = GST_VIDEO_INFO_HEIGHT(&vo->videoinfo);
-
-/*    double pixel_aspect_inv = ((double)vo->videoinfo.par_d)/((double)vo->videoinfo.par_n);
-
-    cairo_scale(cr, pixel_aspect_inv, 1.0f);
-    cairo_set_source_rgba(cr, 1.0, 0.0, 0.0, 0.7);*/
-    if (vo->overlay_surface) {
-        cairo_rectangle(cr, 0, 0, width, height);
-        cairo_set_source_surface(cr, vo->overlay_surface, 0, 0);
-        cairo_paint(cr);
-    }
+    vo->width = width;
+    vo->height = height;
+    vo->pixel_aspect = pixel_aspect;
+    vo->videoinfo_valid = 1;
 }
 
 gboolean video_output_get_overlay_surface_parameters(VideoOutput *vo, gint *width, gint *height, gdouble *pixel_aspect)
@@ -546,23 +527,18 @@ gboolean video_output_get_overlay_surface_parameters(VideoOutput *vo, gint *widt
         return FALSE;
 
     if (width)
-        *width = GST_VIDEO_INFO_WIDTH(&vo->videoinfo);
+        *width = vo->width;
     if (height)
-        *height = GST_VIDEO_INFO_HEIGHT(&vo->videoinfo);
+        *height = vo->height;
     if (pixel_aspect)
-        *pixel_aspect = ((gdouble)vo->videoinfo.par_n)/((gdouble)vo->videoinfo.par_d);
+        *pixel_aspect = vo->pixel_aspect;
 
     return TRUE;
 }
 
 void video_output_set_overlay_surface(VideoOutput *vo, cairo_surface_t *overlay)
 {
-    if (vo->overlay_surface) {
-        cairo_surface_destroy(vo->overlay_surface);
-        vo->overlay_surface = NULL;
-    }
-
-    vo->overlay_surface = overlay;
+    g_object_set(G_OBJECT(vo->cairooverlay), "surface", overlay, NULL);
 }
 
 void video_output_setup_pipeline(VideoOutput *vo)
@@ -595,17 +571,10 @@ void video_output_setup_pipeline(VideoOutput *vo)
     g_object_set(G_OBJECT(source), "fd", vo->infile, NULL);
 
     /* check if textoverlay/textrender suffices and we can get rid of videoconvert */
-    vo->cairooverlay = gst_element_factory_make("cairooverlay", "cairooverlay");
+    vo->cairooverlay = gst_element_factory_make("cairostaticoverlay", "cairooverlay");
     /* videoconvert was ffmpegcolorspace before 1.0 */
-    vo->videoconvert[0] = gst_element_factory_make("videoconvert", "videoconvert0");
-    vo->videoconvert[1] = gst_element_factory_make("videoconvert", "videoconvert1");
-    if (!vo->cairooverlay || !vo->videoconvert[0] || !vo->videoconvert[1])
-        fprintf(stderr, "cairooverlay: %p, videoconvert: %p, colorspace: %p\n",
-                vo->cairooverlay, vo->videoconvert[0], vo->videoconvert[1]);
-    g_signal_connect(G_OBJECT(vo->cairooverlay), "draw",
-            G_CALLBACK(video_output_cairo_draw), vo);
-    g_signal_connect(G_OBJECT(vo->cairooverlay), "caps-changed",
-            G_CALLBACK(video_output_cairo_caps_changed), vo);
+    g_signal_connect(G_OBJECT(vo->cairooverlay), "info-changed",
+            G_CALLBACK(video_output_cairo_info_changed), vo);
 
 #if GST_CHECK_VERSION(1, 0, 0)
     GstElement *decoder = gst_element_factory_make("decodebin", "decodebin");
@@ -619,22 +588,19 @@ void video_output_setup_pipeline(VideoOutput *vo)
 
     fprintf(stderr, "pipeline: %p, source: %p, decoder: %p\n",
             vo->pipeline, source, decoder);
-    gst_bin_add_many(GST_BIN(vo->pipeline), source, decoder, vo->videoconvert[0], vo->cairooverlay,
-            vo->videoconvert[1], vo->playsink, NULL);
+    gst_bin_add_many(GST_BIN(vo->pipeline), source, decoder, vo->cairooverlay,
+            vo->playsink, NULL);
     if (!gst_element_link(source, decoder)) {
         g_printerr("Elements could not be linked. (source -> decoder)\n");
     }
-    if (!gst_element_link_many(vo->videoconvert[0], vo->cairooverlay, vo->videoconvert[1], NULL)) {
-        g_printerr("Elements could not be linked. (videoconvert[0] -> cairooverlay -> videoconvert[1])\n");
-    }
 
     GstPad *playsink_video_pad = gst_element_get_request_pad(vo->playsink, "video_sink");
-    GstPad *videoconvert_pad = gst_element_get_static_pad(vo->videoconvert[1], "src");
+    GstPad *videoconvert_pad = gst_element_get_static_pad(vo->cairooverlay, "src");
     GstPadLinkReturn ret;
     if (playsink_video_pad && videoconvert_pad) {
         ret = gst_pad_link(videoconvert_pad, playsink_video_pad);
         if (GST_PAD_LINK_FAILED(ret))
-            g_print("Linking convert -> playsink failed\n");
+            g_print("Linking overlay -> playsink failed\n");
         else
             g_print("Linking successful\n");
     }
