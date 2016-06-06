@@ -102,6 +102,12 @@ gboolean main_check_mouse_motion(gpointer data)
         appdata.blank_cursor = gdk_cursor_new_from_name(gdk_display_get_default(), "none");
     if (!appstatus.gui.main_window.fullscreen) {
         gdk_window_set_cursor(gtk_widget_get_window(widgets.main_window), NULL);
+        if (appdata.hide_cursor_timer) {
+            g_timer_stop(appdata.hide_cursor_timer);
+            g_timer_destroy(appdata.hide_cursor_timer);
+            appdata.hide_cursor_timer = NULL;
+        }
+        appdata.hide_cursor_source = 0;
         return FALSE;
     }
     gdouble elapsed = g_timer_elapsed(appdata.hide_cursor_timer, NULL);
@@ -118,6 +124,8 @@ gboolean main_check_mouse_motion(gpointer data)
 
 gboolean main_handle_motion_event(GtkWidget *widget, GdkEventMotion *event, gpointer data)
 {
+    if (!appstatus.gui.main_window.fullscreen)
+        return FALSE;
     gdk_window_set_cursor(gtk_widget_get_window(widget), NULL);
     if (!appdata.hide_cursor_timer)
         appdata.hide_cursor_timer = g_timer_new();
