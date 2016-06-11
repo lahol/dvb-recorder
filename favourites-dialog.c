@@ -1,7 +1,9 @@
 #include "favourites-dialog.h"
 #include <dvbrecorder/channel-db.h>
+#include <dvbrecorder/dvbrecorder.h>
 #include "channel-list.h"
 #include "ui-dialog-scan.h"
+#include "ui-dialogs-run.h"
 #include <glib/gi18n.h>
 #include <glib/gprintf.h>
 #include <stdio.h>
@@ -37,6 +39,7 @@ struct _ChannelFavouritesDialogPrivate {
     GtkWidget *channel_all_list;
 
     GtkWindow *parent;
+    DVBRecorder *recorder;
 
     GList *fav_lists; /* [element-type: ChannelFavLists] */
     ChannelFavList *current_fav_list;
@@ -144,6 +147,7 @@ G_DEFINE_TYPE(ChannelFavouritesDialog, channel_favourites_dialog, GTK_TYPE_DIALO
 enum {
     PROP_0,
     PROP_PARENT,
+    PROP_RECORDER,
     N_PROPERTIES
 };
 
@@ -194,6 +198,9 @@ static void channel_favourites_dialog_set_property(GObject *object, guint prop_i
         case PROP_PARENT:
             channel_favourites_dialog_set_parent(dialog, GTK_WINDOW(g_value_get_object(value)));
             break;
+        case PROP_RECORDER:
+            dialog->priv->recorder = g_value_get_pointer(value);
+            break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, spec);
             break;
@@ -231,6 +238,13 @@ static void channel_favourites_dialog_class_init(ChannelFavouritesDialogClass *k
                 "Parent",
                 GTK_TYPE_WINDOW,
                 G_PARAM_READWRITE));
+
+    g_object_class_install_property(gobject_class,
+            PROP_RECORDER,
+            g_param_spec_pointer("recorder",
+                "DVBRecorder",
+                "The recorder handle",
+                G_PARAM_WRITABLE));
 
     g_type_class_add_private(G_OBJECT_CLASS(klass), sizeof(ChannelFavouritesDialogPrivate));
 }
@@ -627,7 +641,7 @@ static void channel_favourites_dialog_list_changed(GtkComboBox *box, ChannelFavo
 
 static void channel_favourites_dialog_scan_button_clicked(ChannelFavouritesDialog *dialog)
 {
-    GtkResponseType resp = ui_dialog_scan_show(GTK_WIDGET(dialog));
+    GtkResponseType resp = ui_dialog_scan_show(GTK_WIDGET(dialog), dialog->priv->recorder);
     if (resp == GTK_RESPONSE_OK) {
         channel_favourites_dialog_update_channel_list(dialog);
         if (dialog->priv->update_notify_cb)
@@ -825,22 +839,3 @@ void channel_favourites_dialog_set_update_notify(ChannelFavouritesDialog *dialog
     dialog->priv->update_notify_cb = cb;
     dialog->priv->update_notify_data = userdata;
 }
-
-void favourites_dialog_show(GtkWidget *parent, CHANNEL_FAVOURITES_DIALOG_UPDATE_NOTIFY notify_cb, gpointer userdata)
-{
-    GtkWidget *dialog = channel_favourites_dialog_new(GTK_WINDOW(parent));
-    channel_favourites_dialog_set_update_notify(CHANNEL_FAVOURITES_DIALOG(dialog), notify_cb, userdata);
-
-    GtkResponseType result = gtk_dialog_run(GTK_DIALOG(dialog));
-
-    if (result == GTK_RESPONSE_APPLY) {
-        if (channel_favourites_dialog_write_favourite_lists(CHANNEL_FAVOURITES_DIALOG(dialog))
-                && notify_cb) {
-            notify_cb(userdata);
-        }
-    }
-
-    gtk_widget_destroy(dialog);
-}
-
-

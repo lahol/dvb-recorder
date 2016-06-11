@@ -3,6 +3,7 @@
 #include <dvbrecorder/channels.h>
 #include <dvbrecorder/channel-db.h>
 #include <dvbrecorder/dvb-scanner.h>
+#include <dvbrecorder/dvbrecorder.h>
 #include <stdio.h>
 #include <glib/gi18n.h>
 #include <glib/gprintf.h>
@@ -22,6 +23,7 @@ struct _UiDialogScanPrivate {
     guint32 channels_found;
 
     DVBScanner *scanner;
+    DVBRecorder *recorder;
 };
 
 G_DEFINE_TYPE(UiDialogScan, ui_dialog_scan, GTK_TYPE_DIALOG);
@@ -29,10 +31,13 @@ G_DEFINE_TYPE(UiDialogScan, ui_dialog_scan, GTK_TYPE_DIALOG);
 enum {
     PROP_0,
     PROP_PARENT,
+    PROP_RECORDER,
+    PROP_SCANNER,
     N_PROPERTIES
 };
 
 void ui_dialog_scan_set_parent(UiDialogScan *dialog, GtkWindow *parent);
+void ui_dialog_scan_set_recorder(UiDialogScan *dialog, DVBRecorder *recorder);
 
 static void ui_dialog_scan_scan_started(UiDialogScan *dialog, DVBScanner *scanner)
 {
@@ -70,6 +75,25 @@ static void ui_dialog_scan_start_scan(UiDialogScan *self)
     dvb_scanner_set_scan_command(self->priv->scanner, cmd_raw);
     g_free(cmd_raw);
 
+    if (dvb_recorder_get_stream_status(self->priv->recorder) == DVB_STREAM_STATUS_RUNNING) {
+        GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(self),
+                                GTK_DIALOG_DESTROY_WITH_PARENT,
+                                GTK_MESSAGE_WARNING,
+                                GTK_BUTTONS_YES_NO,
+                                "Running stream and recording has to be stopped first. Proceed anyway?");
+        GtkResponseType response = gtk_dialog_run(GTK_DIALOG(dialog));
+        if (GTK_IS_DIALOG(dialog))
+            gtk_widget_destroy(dialog);
+
+        if (response == GTK_RESPONSE_YES) {
+            fprintf(stderr, "stop recorder\n");
+            dvb_recorder_stop(self->priv->recorder);
+        }
+        else {
+            fprintf(stderr, "do not scan\n");
+            return;
+        }
+    }
     dvb_scanner_start(self->priv->scanner);
 }
 
@@ -98,6 +122,9 @@ static void ui_dialog_scan_set_property(GObject *object, guint prop_id,
         case PROP_PARENT:
             ui_dialog_scan_set_parent(self, GTK_WINDOW(g_value_get_object(value)));
 	    break;
+        case PROP_RECORDER:
+            ui_dialog_scan_set_recorder(self, g_value_get_pointer(value));
+            break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, spec);
             break;
@@ -113,6 +140,9 @@ static void ui_dialog_scan_get_property(GObject *object, guint prop_id,
     	case PROP_PARENT:
             g_value_set_object(value, self->priv->parent);
 	    break;
+        case PROP_SCANNER:
+            g_value_set_pointer(value, self->priv->scanner);
+            break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, spec);
             break;
@@ -136,6 +166,20 @@ static void ui_dialog_scan_class_init(UiDialogScanClass *klass)
                 "Parent",
                 GTK_TYPE_WINDOW,
                 G_PARAM_READWRITE));
+
+    g_object_class_install_property(gobject_class,
+            PROP_RECORDER,
+            g_param_spec_pointer("recorder",
+                "DVBRecorder",
+                "The recorder handle",
+                G_PARAM_WRITABLE));
+
+    g_object_class_install_property(gobject_class,
+            PROP_SCANNER,
+            g_param_spec_pointer("scanner",
+                "DVBScanner",
+                "The scanner handle",
+                G_PARAM_READABLE));
 
     g_type_class_add_private(G_OBJECT_CLASS(klass), sizeof(UiDialogScanPrivate));
 }
@@ -209,17 +253,7 @@ void ui_dialog_scan_set_parent(UiDialogScan *dialog, GtkWindow *parent)
     gtk_window_set_modal(GTK_WINDOW(dialog), TRUE);
 }
 
-GtkResponseType ui_dialog_scan_show(GtkWidget *parent)
+void ui_dialog_scan_set_recorder(UiDialogScan *dialog, DVBRecorder *recorder)
 {
-    GtkWidget *dialog = ui_dialog_scan_new(GTK_WINDOW(parent));
-
-    GtkResponseType result = gtk_dialog_run(GTK_DIALOG(dialog));
-    dvb_scanner_stop(UI_DIALOG_SCAN(dialog)->priv->scanner);
-    if (result == GTK_RESPONSE_OK) {
-        dvb_scanner_update_channels_db(UI_DIALOG_SCAN(dialog)->priv->scanner);
-    }
-
-    gtk_widget_destroy(dialog);
-
-    return result;
+    dialog->priv->recorder = recorder;
 }

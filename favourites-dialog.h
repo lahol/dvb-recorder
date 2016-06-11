@@ -41,7 +41,6 @@ void channel_favourites_dialog_set_parent(ChannelFavouritesDialog *dialog, GtkWi
 typedef void (*CHANNEL_FAVOURITES_DIALOG_UPDATE_NOTIFY)(gpointer userdata);
 void channel_favourites_dialog_set_update_notify(ChannelFavouritesDialog *dialog,
         CHANNEL_FAVOURITES_DIALOG_UPDATE_NOTIFY cb, gpointer userdata);
-
-void favourites_dialog_show(GtkWidget *parent, CHANNEL_FAVOURITES_DIALOG_UPDATE_NOTIFY notify_cb, gpointer userdata);
+gboolean channel_favourites_dialog_write_favourite_lists(ChannelFavouritesDialog *dialog);
 
 G_END_DECLS

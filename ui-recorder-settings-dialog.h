@@ -2,7 +2,6 @@
 
 #include <glib-object.h>
 #include <gtk/gtk.h>
-#include <dvbrecorder/dvbrecorder.h>
 
 G_BEGIN_DECLS
 
@@ -30,11 +29,8 @@ struct _UiRecorderSettingsDialogClass {
 
 GType ui_recorder_settings_dialog_get_type(void) G_GNUC_CONST;
 
-GtkWidget *ui_recorder_settings_dialog_new(GtkWindow *parent, DVBRecorder *recorder);
+GtkWidget *ui_recorder_settings_dialog_new(GtkWindow *parent);
 
-void ui_recorder_settings_dialog_set_parent(UiRecorderSettingsDialog *dialog, GtkWindow *parent);
-void ui_recorder_settings_dialog_set_recorder(UiRecorderSettingsDialog *dialog, DVBRecorder *recorder);
-
-void ui_recorder_settings_dialog_show(GtkWidget *parent, DVBRecorder *recorder);
+void ui_recorder_settings_dialog_set_recorder_filter(UiRecorderSettingsDialog *dialog);
 
 G_END_DECLS

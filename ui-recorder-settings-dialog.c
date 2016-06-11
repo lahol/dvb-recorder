@@ -2,6 +2,7 @@
 #include <glib/gi18n.h>
 #include <glib/gprintf.h>
 #include <dvbrecorder/filter.h>
+#include <dvbrecorder/dvbrecorder.h>
 #include "config.h"
 
 enum {
@@ -56,7 +57,8 @@ enum {
 
 void ui_recorder_settings_dialog_check_filter(UiRecorderSettingsDialog *dialog);
 void ui_recorder_settings_dialog_set_recorder_filter(UiRecorderSettingsDialog *dialog);
-
+void ui_recorder_settings_dialog_set_parent(UiRecorderSettingsDialog *dialog, GtkWindow *parent);
+void ui_recorder_settings_dialog_set_recorder(UiRecorderSettingsDialog *dialog, DVBRecorder *recorder);
 
 static void ui_recorder_settings_dialog_dispose(GObject *gobject)
 {
@@ -175,11 +177,10 @@ static void ui_recorder_settings_dialog_init(UiRecorderSettingsDialog *self)
     populate_widget(self);
 }
 
-GtkWidget *ui_recorder_settings_dialog_new(GtkWindow *parent, DVBRecorder *recorder)
+GtkWidget *ui_recorder_settings_dialog_new(GtkWindow *parent)
 {
     return g_object_new(UI_RECORDER_SETTINGS_DIALOG_TYPE,
             "parent", parent,
-            "recorder", recorder,
             NULL);
 }
 
@@ -220,23 +221,3 @@ void ui_recorder_settings_dialog_set_recorder_filter(UiRecorderSettingsDialog *d
 
     dvb_recorder_set_record_filter(dialog->priv->recorder, filter);
 }
-
-void ui_recorder_settings_dialog_show(GtkWidget *parent, DVBRecorder *recorder)
-{
-    GtkWidget *dialog = ui_recorder_settings_dialog_new(GTK_WINDOW(parent), recorder);
-
-    GtkResponseType result = gtk_dialog_run(GTK_DIALOG(dialog));
-
-    if (result == GTK_RESPONSE_APPLY) {
-        ui_recorder_settings_dialog_set_recorder_filter(UI_RECORDER_SETTINGS_DIALOG(dialog));
-        config_set("dvb", "record-streams", CFG_TYPE_INT,
-                GINT_TO_POINTER(dvb_recorder_get_record_filter(recorder)));
-    }
-
-    fprintf(stderr, "destroying\n");
-    if (GTK_IS_DIALOG(dialog))
-        gtk_widget_destroy(dialog);
-    fprintf(stderr, "destroyed\n");
-}
-
-

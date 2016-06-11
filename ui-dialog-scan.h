@@ -34,6 +34,4 @@ GtkWidget *ui_dialog_scan_new(GtkWindow *parent);
 GList *ui_dialog_scan_get_scanned_satellites(UiDialogScan *dialog); /*[element-type: gchar * */
 GList *ui_dialog_scan_get_channel_results(UiDialogScan *dialog);    /*[element-type: ChannelData * */
 
-GtkResponseType ui_dialog_scan_show(GtkWidget *parent);
-
 G_END_DECLS

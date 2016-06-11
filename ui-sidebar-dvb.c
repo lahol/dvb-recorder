@@ -42,7 +42,7 @@ static void ui_sidebar_channels_finalize(GObject *gobject)
 static void ui_sidebar_channels_set_property(GObject *object, guint prop_id,
         const GValue *value, GParamSpec *spec)
 {
-    UiSidebarChannels *self = UI_SIDEBAR_CHANNELS(object);
+    /*UiSidebarChannels *self = UI_SIDEBAR_CHANNELS(object);*/
 
     switch (prop_id) {
         default:
@@ -54,7 +54,7 @@ static void ui_sidebar_channels_set_property(GObject *object, guint prop_id,
 static void ui_sidebar_channels_get_property(GObject *object, guint prop_id,
         GValue *value, GParamSpec *spec)
 {
-    UiSidebarChannels *self = UI_SIDEBAR_CHANNELS(object);
+    /*UiSidebarChannels *self = UI_SIDEBAR_CHANNELS(object);*/
 
     switch (prop_id) {
         default:

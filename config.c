@@ -3,9 +3,9 @@
 
 GKeyFile *_config_keyfile;
 
-static GOptionEntry _cmd_line_options[] = {
+/*static GOptionEntry _cmd_line_options[] = {
     { NULL }
-};
+};*/
 
 gint config_read_cmdline(int *pargc, char ***pargv)
 {

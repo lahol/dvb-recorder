@@ -506,10 +506,10 @@ static void video_output_gst_state_changed_cb(GstBus *bus, GstMessage *msg, Vide
     }
 }
 
-static void video_output_gst_message(GstBus *bus, GstMessage *msg, VideoOutput *vo)
+/*static void video_output_gst_message(GstBus *bus, GstMessage *msg, VideoOutput *vo)
 {
     fprintf(stderr, "message from %s: %s\n", GST_OBJECT_NAME(msg->src), gst_message_type_get_name(msg->type));
-}
+}*/
 
 static void video_output_cairo_info_changed(GstElement *overlay, guint width, guint height, gdouble pixel_aspect, VideoOutput *vo)
 {

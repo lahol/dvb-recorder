@@ -14,6 +14,7 @@
 #include "ui-sidebar-dvb.h"
 #include "favourites-dialog.h"
 #include "ui-recorder-settings-dialog.h"
+#include "ui-dialogs-run.h"
 
 #include "config.h"
 #include "status.h"
@@ -374,7 +375,7 @@ void main_menu_quit(gpointer userdata)
 
 void main_menu_show_favourites_dialog(void)
 {
-    favourites_dialog_show(widgets.main_window,
+    favourites_dialog_show(widgets.main_window, appdata.recorder,
             (CHANNEL_FAVOURITES_DIALOG_UPDATE_NOTIFY)ui_sidebar_channels_update_favourites,
             widgets.channel_list);
 }
