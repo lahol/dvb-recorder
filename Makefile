@@ -2,7 +2,7 @@ CC = gcc
 LD = gcc
 PKG_CONFIG := pkg-config
 
-CFLAGS = -Wall -g `$(PKG_CONFIG) --cflags glib-2.0 gtk+-3.0 gdk-3.0 x11 json-glib-1.0`
+CFLAGS = -Wall `$(PKG_CONFIG) --cflags glib-2.0 gtk+-3.0 gdk-3.0 x11 json-glib-1.0`
 LIBS   = `$(PKG_CONFIG) --libs glib-2.0 gtk+-3.0 gdk-3.0 x11 json-glib-1.0` -lsqlite3 -ldvbrecorder -lpng
 
 ifdef GSTREAMER010
@@ -11,6 +11,12 @@ ifdef GSTREAMER010
 else
 	CFLAGS += `$(PKG_CONFIG) --cflags gstreamer-1.0 gstreamer-plugins-base-1.0 gstreamer-base-1.0`
 	LIBS   += `$(PKG_CONFIG) --libs gstreamer-1.0 gstreamer-plugins-base-1.0 gstreamer-base-1.0` -lgstvideo-1.0 -lgstaudio-1.0
+endif
+
+ifdef RELEASE
+	CFLAGS += -O2
+else
+	CFLAGS += -g
 endif
 
 RCVERSION := '$(shell git describe --tags --always) ($(shell git log --pretty=format:%cd --date=short -n1), branch \"$(shell git describe --tags --always --all | sed s:heads/::)\")'
