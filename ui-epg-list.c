@@ -35,6 +35,17 @@ enum {
     EPG_N_ROWS
 };
 
+static gboolean ui_epg_list_key_release_event(GtkWidget *self, GdkEventKey *event)
+{
+    g_return_val_if_fail(IS_UI_EPG_LIST(self), FALSE);
+
+    if (event->keyval == GDK_KEY_Escape) {
+        gtk_stack_set_visible_child(GTK_STACK(UI_EPG_LIST(self)->priv->stack), UI_EPG_LIST(self)->priv->overview_page);
+        return TRUE;
+    }
+    return FALSE;
+}
+
 static void ui_epg_list_dispose(GObject *gobject)
 {
     /*UiEpgList *self = UI_EPG_LIST(gobject);*/
@@ -80,12 +91,16 @@ static void ui_epg_list_get_property(GObject *object, guint prop_id,
 static void ui_epg_list_class_init(UiEpgListClass *klass)
 {
     GObjectClass *gobject_class = G_OBJECT_CLASS(klass);
+    GtkWidgetClass *widget_class = GTK_WIDGET_CLASS(klass);
 
     /* override GObject methods */
     gobject_class->dispose = ui_epg_list_dispose;
     gobject_class->finalize = ui_epg_list_finalize;
     gobject_class->set_property = ui_epg_list_set_property;
     gobject_class->get_property = ui_epg_list_get_property;
+
+    widget_class->key_release_event = ui_epg_list_key_release_event;
+    
 
 /*    g_object_class_install_property(gobject_class,
             PROP_MODEL,

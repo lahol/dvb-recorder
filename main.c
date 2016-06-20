@@ -60,6 +60,7 @@ AppStatus appstatus;
 
 GtkWidget *main_create_context_menu(void);
 void main_recorder_channel_selected_cb(UiSidebarChannels *sidebar, guint channel_id, gpointer userdata);
+gboolean main_dialog_delete_event(GtkWidget *widget, GdkEvent *event, gpointer userdata);
 
 void main_window_status_set_visible(GtkWidget *window, GuiWindowStatus *status, gboolean is_visible)
 {
@@ -352,6 +353,11 @@ static void main_drawing_area_realize(GtkWidget *widget, gpointer data)
     fprintf(stderr, "drawing_area_realize\n");
 }
 
+gboolean main_dialog_delete_event(GtkWidget *widget, GdkEvent *event, gpointer userdata)
+{
+    return TRUE;
+}
+
 void main_menu_show_channels_dialog(gpointer userdata)
 {
     main_window_status_toggle_show(widgets.channels_dialog, &appstatus.gui.channels_dialog);
@@ -561,8 +567,12 @@ void main_init_channels_dialog(void)
     widgets.channels_dialog = gtk_dialog_new();
     g_signal_connect(G_OBJECT(widgets.channels_dialog), "configure-event",
             G_CALLBACK(main_window_status_configure_event), &appstatus.gui.channels_dialog);
+    g_signal_connect(G_OBJECT(widgets.channels_dialog), "delete-event",
+            G_CALLBACK(main_dialog_delete_event), NULL);
     gtk_window_set_transient_for(GTK_WINDOW(widgets.channels_dialog), GTK_WINDOW(widgets.main_window));
     GtkWidget *content = gtk_dialog_get_content_area(GTK_DIALOG(widgets.channels_dialog));
+
+    gtk_window_set_title(GTK_WINDOW(widgets.channels_dialog), _("Channels"));
 
 /*    GtkWidget *entry = gtk_entry_new();
     gtk_box_pack_start(GTK_BOX(content), entry, TRUE, TRUE, 0);*/
@@ -585,8 +595,12 @@ void main_init_epg_dialog(void)
     widgets.epg_dialog = gtk_dialog_new();
     g_signal_connect(G_OBJECT(widgets.epg_dialog), "configure-event",
             G_CALLBACK(main_window_status_configure_event), &appstatus.gui.epg_dialog);
+    g_signal_connect(G_OBJECT(widgets.epg_dialog), "delete-event",
+            G_CALLBACK(main_dialog_delete_event), NULL);
     gtk_window_set_transient_for(GTK_WINDOW(widgets.epg_dialog), GTK_WINDOW(widgets.main_window));
     GtkWidget *content = gtk_dialog_get_content_area(GTK_DIALOG(widgets.epg_dialog));
+
+    gtk_window_set_title(GTK_WINDOW(widgets.epg_dialog), _("Program information"));
 
     widgets.epg_list = ui_epg_list_new();
     
@@ -602,8 +616,12 @@ void main_init_control_dialog(void)
     widgets.control_dialog = gtk_dialog_new();
     g_signal_connect(G_OBJECT(widgets.control_dialog), "configure-event",
             G_CALLBACK(main_window_status_configure_event), &appstatus.gui.control_dialog);
+    g_signal_connect(G_OBJECT(widgets.control_dialog), "delete-event",
+            G_CALLBACK(main_dialog_delete_event), NULL);
     gtk_window_set_transient_for(GTK_WINDOW(widgets.control_dialog), GTK_WINDOW(widgets.main_window));
     GtkWidget *content = gtk_dialog_get_content_area(GTK_DIALOG(widgets.control_dialog));
+
+    gtk_window_set_title(GTK_WINDOW(widgets.control_dialog), _("Controls"));
 
     GtkWidget *menu_bar = main_create_main_menu();
     gtk_box_pack_start(GTK_BOX(content), menu_bar, FALSE, FALSE, 0);
