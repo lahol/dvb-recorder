@@ -624,7 +624,9 @@ void main_recorder_channel_selected_cb(UiSidebarChannels *sidebar, guint channel
     appstatus.recorder.channel_id = channel_id;
     appstatus.recorder.running = 1;
 
+    /*
     gtk_window_present(GTK_WINDOW(widgets.main_window));
+    */
 }
 
 void main_ui_update_button_status(void)
