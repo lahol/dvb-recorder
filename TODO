@@ -27,3 +27,21 @@
  ✔ stop stream to scan for channels (ask before)
  * show record status (time, file, …)
  * epg-list: on update, do not loose current selection (if still available)
+
+ * select last favourites list after restart, as well as last chosen channel
+ * select channels with arrow keys, pgup, pgdown (config: tune in immediately or not)
+ * show red record symbol and duration
+ * scheduled recording with epg
+ * tooltips for buttons/symbols
+ * fullscreen -> normal via esc
+ * terminate program with escape (warn if recording is running or planned)
+ * index entries in channel and fav-list consequtively)
+ * fixed numbers for channels configurable (to sync with other devices)
+ * edit channel list: select current fav-list
+ * channel list split for satellites (notebook) and select current chosen satellite
+ * in edit channel list: tune to channel possible (not modal) also in current edited list
+ * mark channels already in fav-list
+ * volume to low?
+ * snapshot: show filename
+ * set permissions for recordings (a+r)
+ * BUG: hotbird -> snapshot -> crash
