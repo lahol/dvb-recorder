@@ -19,6 +19,7 @@
 
 #include "video-output.h"
 #include "utils.h"
+#include "logging.h"
 
 struct _VideoOutput {
     GtkWidget *drawing_area;
@@ -63,7 +64,7 @@ VideoOutput *video_output_new(GtkWidget *drawing_area, VIDEOOUTPUTEVENTCALLBACK 
 
     vo->drawing_area = drawing_area;
     vo->window_id = GDK_WINDOW_XID(gtk_widget_get_window(GTK_WIDGET(drawing_area)));
-    fprintf(stderr, "vo->window_id: %lu\n", vo->window_id);
+    LOG("vo->window_id: %lu\n", vo->window_id);
     vo->infile = -1;
     vo->communication_pipe[0] = -1;
     vo->communication_pipe[1] = -1;
@@ -81,7 +82,7 @@ VideoOutput *video_output_new(GtkWidget *drawing_area, VIDEOOUTPUTEVENTCALLBACK 
 
 void video_output_destroy(VideoOutput *vo)
 {
-    fprintf(stderr, "video_output_destroy\n");
+    LOG("video_output_destroy\n");
     if (vo == NULL)
         return;
 
@@ -93,7 +94,7 @@ void video_output_destroy(VideoOutput *vo)
 
 void video_output_stream_start(VideoOutput *vo)
 {
-    fprintf(stderr, "video_output_stream_start\n");
+    LOG("video_output_stream_start\n");
 /*    pipe(vo->communication_pipe);
     pipe(vo->video_pipe);
     vo->thread = g_thread_new("VideoThread", (GThreadFunc)video_output_thread_proc, vo);*/
@@ -106,7 +107,7 @@ void video_output_stream_start(VideoOutput *vo)
 
 void video_output_stream_stop(VideoOutput *vo)
 {
-    fprintf(stderr, "video_output_stream_stop\n");
+    LOG("video_output_stream_stop\n");
  /*   if (vo->thread) {
         write(vo->communication_pipe[1], "stop", 4);
         g_thread_join(vo->thread);
@@ -126,11 +127,11 @@ void video_output_stream_stop(VideoOutput *vo)
 
 void video_output_set_infile(VideoOutput *vo, int fd)
 {
-    fprintf(stderr, "video_output_set_infile: %d\n", fd);
+    LOG("video_output_set_infile: %d\n", fd);
     g_return_if_fail(vo != NULL);
 
     g_mutex_lock(&vo->infile_mutex);
-    fprintf(stderr, "vo->infile: %d\n", vo->infile);
+    LOG("vo->infile: %d\n", vo->infile);
     if (vo->infile != -1) {
         vo->infile = -1;
         video_output_stream_stop(vo);
@@ -173,7 +174,7 @@ gboolean video_output_snapshot(VideoOutput *vo, const gchar *filename)
         goto error;
 
     gchar *strcaps = gst_caps_to_string(caps);
-    fprintf(stderr, "Buffer caps: %s\n", strcaps);
+    LOG("Buffer caps: %s\n", strcaps);
     g_free(strcaps);
 
     s = gst_caps_get_structure(caps, 0);
@@ -181,7 +182,7 @@ gboolean video_output_snapshot(VideoOutput *vo, const gchar *filename)
     gst_structure_get_int(s, "height", &height);
     bpp = 24;
     
-    fprintf(stderr, "w: %d, h: %d, bpp: %d\n", width, height, bpp);
+    LOG("w: %d, h: %d, bpp: %d\n", width, height, bpp);
 
 
     buffer = gst_sample_get_buffer(sample);
@@ -192,11 +193,11 @@ gboolean video_output_snapshot(VideoOutput *vo, const gchar *filename)
     if (memory == NULL)
         goto error;
 
-    fprintf(stderr, "memory: %p\n", memory);
+    LOG("memory: %p\n", memory);
     GstMapInfo mapinfo;
     gst_memory_map(memory, &mapinfo, GST_MAP_READ);
 
-    fprintf(stderr, "memory size: %zd\n", mapinfo.size);
+    LOG("memory size: %zd\n", mapinfo.size);
 
     if (!util_write_data_to_png(filename, mapinfo.data, width, height, bpp)) {
         gst_memory_unmap(memory, &mapinfo);
@@ -235,7 +236,7 @@ error:
         goto error;
 
     gchar *strcaps = gst_caps_to_string(caps);
-    fprintf(stderr, "Buffer caps: %s\n", strcaps);
+    LOG("Buffer caps: %s\n", strcaps);
     g_free(strcaps);
 
     s = gst_caps_get_structure(caps, 0);
@@ -311,7 +312,7 @@ gdouble video_output_get_volume(VideoOutput *vo)
 
 gpointer video_output_thread_proc(VideoOutput *vo)
 {
-    fprintf(stderr, "video_output_thread_proc\n");
+    LOG("video_output_thread_proc\n");
 
     uint8_t buffer[16384];
     ssize_t bytes_read;
@@ -325,31 +326,31 @@ gpointer video_output_thread_proc(VideoOutput *vo)
 
     vo->write_error = 0;
 
-    fprintf(stderr, "fd = { %d, %d }\n", pfd[0].fd, pfd[1].fd);
+    LOG("fd = { %d, %d }\n", pfd[0].fd, pfd[1].fd);
 
     while (1) {
         if (poll(pfd, 2, 1500)) {
-            fprintf(stderr, "poll (events: 0x%02x, 0x%02x)\n", pfd[0].revents, pfd[1].revents);
+            LOG("poll (events: 0x%02x, 0x%02x)\n", pfd[0].revents, pfd[1].revents);
             
             if (pfd[1].revents & POLLIN) {
                 bytes_read = read(pfd[1].fd, buffer, 16384);
                 if (bytes_read <= 0) {
                     if (errno == EAGAIN)
                         continue;
-                    fprintf(stderr, "Error reading data. Stopping thread. (%d) %s\n", errno, strerror(errno));
+                    LOG("Error reading data. Stopping thread. (%d) %s\n", errno, strerror(errno));
                     break;
                 }
                 /* write to video pipe */
-                fprintf(stderr, "writing %zd bytes\n", bytes_read);
+                LOG("writing %zd bytes\n", bytes_read);
                 fflush(stderr);
                 write(vo->video_pipe[1], buffer, bytes_read);
             }
             else if (pfd[1].revents & POLLNVAL) {
-                fprintf(stderr, "Remote hung up\n");
+                LOG("Remote hung up\n");
                 break;
             }
             else if (pfd[0].revents & POLLIN) {
-                fprintf(stderr, "Received data on control pipe. Stopping thread.\n");
+                LOG("Received data on control pipe. Stopping thread.\n");
                 break;
             }
         }
@@ -363,7 +364,7 @@ static void video_output_unknown_type_handler(GstElement *bin, GstPad *pad, GstC
     GstStructure *structure = gst_caps_get_structure(caps, 0);
     const gchar *type = gst_structure_get_name(structure);
 
-    fprintf(stderr, "unknown type: %s\n", type);
+    LOG("unknown type: %s\n", type);
 }
 
 static void video_output_pad_added_handler(GstElement *src, GstPad *new_pad, VideoOutput *vo)
@@ -383,7 +384,7 @@ static void video_output_pad_added_handler(GstElement *src, GstPad *new_pad, Vid
     new_pad_struct = gst_caps_get_structure(new_pad_caps, 0);
     new_pad_type = gst_structure_get_name(new_pad_struct);
 
-    fprintf(stderr, "VideoOutput, pad new type: %s\n", new_pad_type);
+    LOG("VideoOutput, pad new type: %s\n", new_pad_type);
 
     GstElementClass *cls;
     GstPadTemplate *templ = NULL;
@@ -423,7 +424,7 @@ done:
 
 static GstBusSyncReply video_output_bus_sync_handler(GstBus *bus, GstMessage *message, VideoOutput *vo)
 {
-/*    fprintf(stderr, "bus_sync_handler\n");*/
+/*    LOG("bus_sync_handler\n");*/
 #if GST_CHECK_VERSION(1,0,0)
     if (!gst_is_video_overlay_prepare_window_handle_message(message))
         return GST_BUS_PASS;
@@ -432,7 +433,7 @@ static GstBusSyncReply video_output_bus_sync_handler(GstBus *bus, GstMessage *me
         gst_video_overlay_set_window_handle(overlay, vo->window_id);
     }
     else {
-        fprintf(stderr, "VideoOutput: should have window id now\n");
+        LOG("VideoOutput: should have window id now\n");
     }
 
     gst_message_unref(message);
@@ -440,16 +441,16 @@ static GstBusSyncReply video_output_bus_sync_handler(GstBus *bus, GstMessage *me
 #else
     if (GST_MESSAGE_TYPE(message) != GST_MESSAGE_ELEMENT)
         return GST_BUS_PASS;
-    fprintf(stderr, "structure name: %s\n", gst_structure_get_name(message->structure));
+    LOG("structure name: %s\n", gst_structure_get_name(message->structure));
     if (!gst_structure_has_name(message->structure, "prepare-xwindow-id"))
         return GST_BUS_PASS;
 
     if (vo->window_id != 0) {
-        fprintf(stderr, "VideoOutput: set window id %lu\n", vo->window_id);
+        LOG("VideoOutput: set window id %lu\n", vo->window_id);
         gst_x_overlay_set_window_handle(GST_X_OVERLAY(GST_MESSAGE_SRC(message)), vo->window_id);
     }
     else {
-        fprintf(stderr, "VideoOutput: should have window id now\n");
+        LOG("VideoOutput: should have window id now\n");
     }
 
     gst_message_unref(message);
@@ -482,7 +483,7 @@ static void video_output_gst_state_changed_cb(GstBus *bus, GstMessage *msg, Vide
     GstState old_state, new_state, pending_state;
     gst_message_parse_state_changed(msg, &old_state, &new_state, &pending_state);
     if (GST_MESSAGE_SRC(msg) == GST_OBJECT(vo->pipeline)) {
-        fprintf(stderr, "State set from %s to %s (pending: %s)\n",
+        LOG("State set from %s to %s (pending: %s)\n",
                 gst_element_state_get_name(old_state),
                 gst_element_state_get_name(new_state),
                 gst_element_state_get_name(pending_state));
@@ -508,7 +509,7 @@ static void video_output_gst_state_changed_cb(GstBus *bus, GstMessage *msg, Vide
 
 /*static void video_output_gst_message(GstBus *bus, GstMessage *msg, VideoOutput *vo)
 {
-    fprintf(stderr, "message from %s: %s\n", GST_OBJECT_NAME(msg->src), gst_message_type_get_name(msg->type));
+    LOG("message from %s: %s\n", GST_OBJECT_NAME(msg->src), gst_message_type_get_name(msg->type));
 }*/
 
 static void video_output_cairo_info_changed(GstElement *overlay, guint width, guint height, gdouble pixel_aspect, VideoOutput *vo)
@@ -543,21 +544,21 @@ void video_output_set_overlay_surface(VideoOutput *vo, cairo_surface_t *overlay)
 
 void video_output_setup_pipeline(VideoOutput *vo)
 {
-    fprintf(stderr, "video_output_setup_pipeline: %p\n", vo->pipeline);
+    LOG("video_output_setup_pipeline: %p\n", vo->pipeline);
     g_mutex_lock(&vo->pipeline_mutex);
     if (vo->pipeline) {
         g_mutex_unlock(&vo->pipeline_mutex);
         return;
     }
 
-    fprintf(stderr, "new pipeline\n");
+    LOG("new pipeline\n");
     vo->pipeline = gst_pipeline_new(NULL);
 
-    fprintf(stderr, "make xvimagesink\n");
+    LOG("make xvimagesink\n");
     vo->vsink = gst_element_factory_make("xvimagesink", "xvimagesink");
     g_object_set(G_OBJECT(vo->vsink), "force-aspect-ratio", TRUE, NULL);
 
-    fprintf(stderr, "make playsink\n");
+    LOG("make playsink\n");
     vo->playsink = gst_element_factory_make("playsink", "playsink");
     g_object_set(G_OBJECT(vo->playsink),
             "video-sink", vo->vsink,
@@ -565,9 +566,9 @@ void video_output_setup_pipeline(VideoOutput *vo)
             "mute", vo->is_muted,
             NULL);
 
-    fprintf(stderr, "video_output_setup_pipeline, make fdsrc\n");
+    LOG("video_output_setup_pipeline, make fdsrc\n");
     GstElement *source = gst_element_factory_make("fdsrc", "fdsrc");
-    fprintf(stderr, "fdsrc: %d\n", vo->infile);
+    LOG("fdsrc: %d\n", vo->infile);
     g_object_set(G_OBJECT(source), "fd", vo->infile, NULL);
 
     /* check if textoverlay/textrender suffices and we can get rid of videoconvert */
@@ -586,7 +587,7 @@ void video_output_setup_pipeline(VideoOutput *vo)
     g_signal_connect(G_OBJECT(decoder), "unknown-type",
             G_CALLBACK(video_output_unknown_type_handler), NULL);
 
-    fprintf(stderr, "pipeline: %p, source: %p, decoder: %p\n",
+    LOG("pipeline: %p, source: %p, decoder: %p\n",
             vo->pipeline, source, decoder);
     gst_bin_add_many(GST_BIN(vo->pipeline), source, decoder, vo->cairooverlay,
             vo->playsink, NULL);
@@ -630,7 +631,7 @@ void video_output_setup_pipeline(VideoOutput *vo)
 
 void video_output_clear_pipeline(VideoOutput *vo)
 {
-    fprintf(stderr, "video_output_clear_pipeline: %p\n", vo->pipeline);
+    LOG("video_output_clear_pipeline: %p\n", vo->pipeline);
     g_mutex_lock(&vo->pipeline_mutex);
     if (vo->pipeline) {
         gst_element_set_state(vo->pipeline, GST_STATE_NULL);

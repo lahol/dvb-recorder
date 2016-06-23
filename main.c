@@ -213,7 +213,7 @@ void main_init_channel_db(void)
             NULL);
 
     if (channel_db_init(db) != 0)
-        fprintf(stderr, "Failed to init channel db\n");
+        LOG("Failed to init channel db\n");
     g_free(db);
 }
 
@@ -240,7 +240,7 @@ void main_action_snapshot(void)
         filename = dvb_recorder_make_record_filename(appdata.recorder, snapshot_dir, "snapshot-${service_name}-${program_name}-${date:%Y%m%d-%H%M%S}.png");
     }
 
-    fprintf(stderr, "[snapshot] filename: %s\n", filename);
+    LOG("[snapshot] filename: %s\n", filename);
 
     video_output_snapshot(appdata.video_output, filename);
 
@@ -252,11 +252,11 @@ void main_action_record(void)
 {
     /* will get set by event */
     if (appdata.is_recording) {
-        fprintf(stderr, "Stop recording.\n");
+        LOG("Stop recording.\n");
         dvb_recorder_record_stop(appdata.recorder);
     }
     else {
-        fprintf(stderr, "Start recording.\n");
+        LOG("Start recording.\n");
         dvb_recorder_record_start(appdata.recorder);
     }
 }
@@ -302,7 +302,7 @@ static void main_ui_volume_value_changed(GtkScaleButton *button, gdouble value, 
 
 static gboolean main_key_event(GtkWidget *widget, GdkEventKey *event, gpointer data)
 {
-    fprintf(stderr, "key event\n");
+    LOG("key event\n");
     switch (event->keyval) {
         case GDK_KEY_f:
             if (event->type == GDK_KEY_RELEASE)
@@ -347,12 +347,12 @@ static gboolean main_button_event(GtkWidget *widget, GdkEventButton *event, gpoi
 
 static void main_drawing_area_size_allocate(GtkWidget *widget, GtkAllocation *alloc, gpointer data)
 {
-    fprintf(stderr, "drawing_area_size_allocate\n");
+    LOG("drawing_area_size_allocate\n");
 }
 
 static void main_drawing_area_realize(GtkWidget *widget, gpointer data)
 {
-    fprintf(stderr, "drawing_area_realize\n");
+    LOG("drawing_area_realize\n");
 }
 
 gboolean main_dialog_delete_event(GtkWidget *widget, GdkEvent *event, gpointer userdata)
@@ -377,7 +377,7 @@ void main_menu_show_control_dialog(gpointer userdata)
 
 void main_menu_quit(gpointer userdata)
 {
-    fprintf(stderr, "Menu > Quit\n");
+    LOG("Menu > Quit\n");
     gtk_main_quit();
 }
 
@@ -638,7 +638,7 @@ void main_init_control_dialog(void)
 
 void main_recorder_channel_selected_cb(UiSidebarChannels *sidebar, guint channel_id, gpointer userdata)
 {
-    fprintf(stderr, "channel-selected: (%p, %u, %p)\n", sidebar, channel_id, userdata);
+    LOG("channel-selected: (%p, %u, %p)\n", sidebar, channel_id, userdata);
     dvb_recorder_set_channel(appdata.recorder, channel_id);
 
     appstatus.recorder.channel_id = channel_id;
@@ -664,12 +664,12 @@ void _dump_event(EPGEvent *event)
     size_t sz = sizeof(EPGEvent);
     gchar *ptr = (gchar *)event;
     gchar *end = ptr + sz;
-    fprintf(stderr, "[main] dump event %p [%zd]\n", event, sz);
+    LOG("[main] dump event %p [%zd]\n", event, sz);
     while (ptr < end) {
-        fprintf(stderr, "%02x ", *ptr & 0xff);
+        LOG("%02x ", *ptr & 0xff);
         ++ptr;
     }
-    fprintf(stderr, "\n");
+    LOG("\n");
 }
 
 void main_notify_channel_change(void)
@@ -706,7 +706,7 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
                         appdata.is_recording = 0;
                         DVBRecorderRecordStatus status;
                         dvb_recorder_query_record_status(appdata.recorder, &status);
-                        fprintf(stderr, "%zd bytes (%.2f MiB), time: %f.0 seconds\n",
+                        LOG("%zd bytes (%.2f MiB), time: %f.0 seconds\n",
                                 status.filesize, ((double)status.filesize)/(1024*1024), status.elapsed_time);
                     }
                     break;
@@ -807,7 +807,7 @@ int main(int argc, char **argv)
 
     gint ival;
     if (config_get("dvb", "record-streams", CFG_TYPE_INT, &ival) == 0) {
-        fprintf(stderr, "record streams from config: 0x%x\n", ival);
+        LOG("record streams from config: 0x%x\n", ival);
         dvb_recorder_set_record_filter(appdata.recorder, ival);
     }
 
@@ -836,7 +836,7 @@ int main(int argc, char **argv)
     appdata.video_output = video_output_new(widgets.drawing_area, main_video_output_event_callback, NULL);
 
     int fd = dvb_recorder_enable_video_source(appdata.recorder, TRUE);
-    fprintf(stderr, "recorder video source: %d\n", fd);
+    LOG("recorder video source: %d\n", fd);
     video_output_set_infile(appdata.video_output, fd);
 
     appdata.osd = osd_new(appdata.recorder, appdata.video_output);
@@ -863,9 +863,9 @@ int main(int argc, char **argv)
     status_save(&appstatus, status_file);
 
     osd_cleanup(appdata.osd);
-    fprintf(stderr, "destroying video\n");
+    LOG("destroying video\n");
     video_output_destroy(appdata.video_output);
-    fprintf(stderr, "destroying recorder\n");
+    LOG("destroying recorder\n");
     dvb_recorder_destroy(appdata.recorder);
 
     config = g_build_filename(
@@ -885,6 +885,6 @@ int main(int argc, char **argv)
     if (appdata.blank_cursor)
         g_object_unref(G_OBJECT(appdata.blank_cursor));
 
-    fprintf(stderr, "done\n");
+    LOG("done\n");
     return 0;
 }
