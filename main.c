@@ -21,6 +21,8 @@
 #include "ui-epg-list.h"
 #include "osd.h"
 
+#include "logging.h"
+
 struct {
     GtkWidget *main_window;
     GtkWidget *drawing_area;
@@ -694,7 +696,7 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
 {
     switch (event->type) {
         case DVB_RECORDER_EVENT_RECORD_STATUS_CHANGED:
-            fprintf(stderr, "record status changed: %d\n", ((DVBRecorderEventRecordStatusChanged *)event)->status);
+            LOG("record status changed: %d\n", ((DVBRecorderEventRecordStatusChanged *)event)->status);
             switch (((DVBRecorderEventRecordStatusChanged *)event)->status) {
                 case DVB_RECORD_STATUS_RECORDING:
                     appdata.is_recording = 1;
@@ -712,26 +714,26 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
             main_ui_update_button_status();
             break;
         case DVB_RECORDER_EVENT_STREAM_STATUS_CHANGED:
-            fprintf(stderr, "stream status changed: %d\n", ((DVBRecorderEventStreamStatusChanged *)event)->status);
+            LOG("stream status changed: %d\n", ((DVBRecorderEventStreamStatusChanged *)event)->status);
             switch (((DVBRecorderEventStreamStatusChanged *)event)->status) {
                 case DVB_STREAM_STATUS_TUNED:
-                    fprintf(stderr, "dvb-recorder: tuned in\n");
+                    LOG("dvb-recorder: tuned in\n");
                     video_output_set_infile(appdata.video_output,
                             dvb_recorder_enable_video_source(appdata.recorder, TRUE));
                     break;
                 case DVB_STREAM_STATUS_TUNE_FAILED:
-                    fprintf(stderr, "dvb-recorder: tune failed\n");
+                    LOG("dvb-recorder: tune failed\n");
                     video_output_set_infile(appdata.video_output, -1);
                     break;
                 case DVB_STREAM_STATUS_STOPPED:
-                    fprintf(stderr, "dvb-recorder: stopped\n");
+                    LOG("dvb-recorder: stopped\n");
                     video_output_set_infile(appdata.video_output, -1);
                     appdata.is_sdt_ready = 0;
                     appdata.is_video_ready = 0;
                     appdata.notified_channel_change = 0;
                     break;
                 case DVB_STREAM_STATUS_RUNNING:
-                    fprintf(stderr, "dvb-recorder: running\n");
+                    LOG("dvb-recorder: running\n");
                     break;
                 default:
                     break;
@@ -739,18 +741,18 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
             break;
         case DVB_RECORDER_EVENT_EIT_CHANGED:
             {
-                fprintf(stderr, "EIT changed\n");
+                LOG("EIT changed\n");
 
                 GList *events = dvb_recorder_get_epg(appdata.recorder);
                 ui_epg_list_update_events(UI_EPG_LIST(widgets.epg_list), events); 
 
-                fprintf(stderr, "Updated events\n");
+                LOG("Updated events\n");
 
                 g_list_free(events);
             }
             break;
         case DVB_RECORDER_EVENT_SDT_CHANGED:
-            fprintf(stderr, "SDT changed\n");
+            LOG("SDT changed\n");
             appdata.is_sdt_ready = 1;
             main_notify_channel_change();
             break;
@@ -789,6 +791,7 @@ int main(int argc, char **argv)
 
     /* setup librecorder */
     appdata.recorder = dvb_recorder_new(main_recorder_event_callback, NULL);
+    dvb_recorder_set_logger(appdata.recorder, (DVBRecorderLoggerProc)log_logger_cb, NULL);
 
     gchar *value;
     value = main_get_capture_dir();
