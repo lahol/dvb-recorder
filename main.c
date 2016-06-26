@@ -52,6 +52,7 @@ struct {
     guint32 is_video_ready : 1;
     guint32 is_sdt_ready : 1;
     guint32 notified_channel_change : 1;
+    guint32 ignore_events : 1;
 
     guint hide_cursor_source;
     GTimer *hide_cursor_timer;
@@ -694,6 +695,8 @@ void main_video_output_event_callback(VideoOutput *video_output, VideoOutputEven
 
 void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
 {
+    if (appdata.ignore_events)
+        return;
     switch (event->type) {
         case DVB_RECORDER_EVENT_RECORD_STATUS_CHANGED:
             LOG("record status changed: %d\n", ((DVBRecorderEventRecordStatusChanged *)event)->status);
@@ -860,6 +863,7 @@ int main(int argc, char **argv)
 
     gtk_main();
 
+    appdata.ignore_events = 1;
     status_save(&appstatus, status_file);
 
     osd_cleanup(appdata.osd);
