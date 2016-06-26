@@ -379,6 +379,27 @@ void main_menu_show_control_dialog(gpointer userdata)
 void main_menu_quit(gpointer userdata)
 {
     LOG("Menu > Quit\n");
+    DVBRecorderRecordStatus recstatus;
+
+    dvb_recorder_query_record_status(appdata.recorder, &recstatus);
+    if (recstatus.status == DVB_RECORD_STATUS_RECORDING) {
+        GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(widgets.channels_dialog),
+                GTK_DIALOG_DESTROY_WITH_PARENT,
+                GTK_MESSAGE_WARNING,
+                GTK_BUTTONS_YES_NO,
+                "A recording is running and has to be stopped first. Stop the recording and proceed?");
+        GtkResponseType response = gtk_dialog_run(GTK_DIALOG(dialog));
+        if (GTK_IS_DIALOG(dialog))
+            gtk_widget_destroy(dialog);
+
+        if (response == GTK_RESPONSE_YES) {
+            dvb_recorder_stop(appdata.recorder);
+        }
+        else {
+            return;
+        }
+    }
+
     gtk_main_quit();
 }
 
@@ -640,6 +661,28 @@ void main_init_control_dialog(void)
 void main_recorder_channel_selected_cb(UiSidebarChannels *sidebar, guint channel_id, gpointer userdata)
 {
     LOG("channel-selected: (%p, %u, %p)\n", sidebar, channel_id, userdata);
+
+    DVBRecorderRecordStatus recstatus;
+
+    dvb_recorder_query_record_status(appdata.recorder, &recstatus);
+    if (recstatus.status == DVB_RECORD_STATUS_RECORDING) {
+        GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(widgets.channels_dialog),
+                GTK_DIALOG_DESTROY_WITH_PARENT,
+                GTK_MESSAGE_WARNING,
+                GTK_BUTTONS_YES_NO,
+                "A recording is running and has to be stopped first. Stop the recording and proceed?");
+        GtkResponseType response = gtk_dialog_run(GTK_DIALOG(dialog));
+        if (GTK_IS_DIALOG(dialog))
+            gtk_widget_destroy(dialog);
+
+        if (response == GTK_RESPONSE_YES) {
+            dvb_recorder_stop(appdata.recorder);
+        }
+        else {
+            return;
+        }
+    }
+
     dvb_recorder_set_channel(appdata.recorder, channel_id);
 
     appstatus.recorder.channel_id = channel_id;
