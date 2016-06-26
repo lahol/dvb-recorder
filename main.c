@@ -863,6 +863,8 @@ int main(int argc, char **argv)
     status_save(&appstatus, status_file);
 
     osd_cleanup(appdata.osd);
+    LOG("disable video source\n");
+    dvb_recorder_enable_video_source(appdata.recorder, FALSE);
     LOG("destroying video\n");
     video_output_destroy(appdata.video_output);
     LOG("destroying recorder\n");
