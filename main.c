@@ -553,6 +553,7 @@ GtkWidget *main_init_channels_dialog_buttons(void)
     widgets.buttons.record = gtk_toggle_button_new();
     gtk_button_set_image(GTK_BUTTON(widgets.buttons.record),
             gtk_image_new_from_icon_name("media-record", GTK_ICON_SIZE_LARGE_TOOLBAR));
+    gtk_widget_set_tooltip_text(widgets.buttons.record, _("Start recording"));
     /* FIXME: signal handler */
     widgets.buttons.record_toggled_signal =
         g_signal_connect_swapped(G_OBJECT(widgets.buttons.record), "toggled",
@@ -560,6 +561,7 @@ GtkWidget *main_init_channels_dialog_buttons(void)
     gtk_box_pack_start(GTK_BOX(hbox), widgets.buttons.record, FALSE, FALSE, 0);
 
     widgets.buttons.snapshot = gtk_button_new();
+    gtk_widget_set_tooltip_text(widgets.buttons.snapshot, _("Make snapshot"));
     gtk_button_set_image(GTK_BUTTON(widgets.buttons.snapshot),
             gtk_image_new_from_icon_name("document-save", GTK_ICON_SIZE_LARGE_TOOLBAR));
     g_signal_connect_swapped(G_OBJECT(widgets.buttons.snapshot), "clicked",
@@ -567,6 +569,7 @@ GtkWidget *main_init_channels_dialog_buttons(void)
     gtk_box_pack_end(GTK_BOX(hbox), widgets.buttons.snapshot, FALSE, FALSE, 0);
 
     widgets.buttons.volume = gtk_volume_button_new();
+    gtk_widget_set_tooltip_text(widgets.buttons.volume, _("Change Volume"));
     widgets.buttons.volume_changed_signal =
         g_signal_connect(G_OBJECT(widgets.buttons.volume), "value-changed",
                 G_CALLBACK(main_ui_volume_value_changed), NULL);
@@ -700,6 +703,10 @@ void main_ui_update_button_status(void)
     g_signal_handler_block(widgets.buttons.record, widgets.buttons.record_toggled_signal);
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widgets.buttons.record),
             (gboolean)(status.status == DVB_RECORD_STATUS_RECORDING));
+    if (status.status == DVB_RECORD_STATUS_RECORDING)
+        gtk_widget_set_tooltip_text(widgets.buttons.record, _("Stop recording"));
+    else
+        gtk_widget_set_tooltip_text(widgets.buttons.record, _("Start recording"));
     g_signal_handler_unblock(widgets.buttons.record, widgets.buttons.record_toggled_signal);
 }
 

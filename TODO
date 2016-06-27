@@ -43,5 +43,5 @@
  * mark channels already in fav-list
  * volume to low?
  * snapshot: show filename
- * set permissions for recordings (a+r)
- * BUG: hotbird -> snapshot -> crash
+ ✔ set permissions for recordings (a+r)
+ ✔? BUG: hotbird -> snapshot -> crash
