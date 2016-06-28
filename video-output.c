@@ -402,17 +402,24 @@ static void video_output_pad_added_handler(GstElement *src, GstPad *new_pad, Vid
     if (sink_pad) {
         if (gst_pad_is_linked(sink_pad)) {
             LOG("Already linked\n");
+            gst_element_set_locked_state(GST_ELEMENT(new_pad), TRUE);
+            gst_element_set_state(GST_ELEMENT(new_pad), GST_STATE_NULL);
             goto done;
         }
 
         ret = gst_pad_link(new_pad, sink_pad);
-        if (GST_PAD_LINK_FAILED(ret))
+        if (GST_PAD_LINK_FAILED(ret)) {
             LOG("Linking failed\n");
+            gst_element_set_locked_state(GST_ELEMENT(new_pad), TRUE);
+            gst_element_set_state(GST_ELEMENT(new_pad), GST_STATE_NULL);
+        }
         else
             LOG("Linkings successful\n");
     }
     else {
         LOG("could not get sink pad (templ: %p)\n", templ);
+        gst_element_set_locked_state(GST_ELEMENT(new_pad), TRUE);
+        gst_element_set_state(GST_ELEMENT(new_pad), GST_STATE_NULL);
     }
 
 done:
