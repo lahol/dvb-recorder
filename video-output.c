@@ -369,7 +369,7 @@ static void video_output_unknown_type_handler(GstElement *bin, GstPad *pad, GstC
 
 static void video_output_pad_added_handler(GstElement *src, GstPad *new_pad, VideoOutput *vo)
 {
-    g_print("Pad added: %s from %s\n", GST_PAD_NAME(new_pad), GST_ELEMENT_NAME(src));
+    LOG("Pad added: %s from %s\n", GST_PAD_NAME(new_pad), GST_ELEMENT_NAME(src));
     GstCaps *new_pad_caps = NULL;
     GstStructure *new_pad_struct = NULL;
     const gchar *new_pad_type = NULL;
@@ -401,18 +401,18 @@ static void video_output_pad_added_handler(GstElement *src, GstPad *new_pad, Vid
 
     if (sink_pad) {
         if (gst_pad_is_linked(sink_pad)) {
-            g_print("Already linked\n");
+            LOG("Already linked\n");
             goto done;
         }
 
         ret = gst_pad_link(new_pad, sink_pad);
         if (GST_PAD_LINK_FAILED(ret))
-            g_print("Linking failed\n");
+            LOG("Linking failed\n");
         else
-            g_print("Linkings successful\n");
+            LOG("Linkings successful\n");
     }
     else {
-        g_printerr("could not get sink pad (templ: %p)\n", templ);
+        LOG("could not get sink pad (templ: %p)\n", templ);
     }
 
 done:
@@ -464,8 +464,8 @@ static void video_output_gst_error_cb(GstBus *bus, GstMessage *msg, VideoOutput 
     gchar *debug_info;
 
     gst_message_parse_error(msg, &err, &debug_info);
-    g_printerr("Error received from element %s: %s\n", GST_OBJECT_NAME(msg->src), err->message);
-    g_printerr("Debugging information: %s\n", debug_info ? debug_info : "none");
+    LOG("Error received from element %s: %s\n", GST_OBJECT_NAME(msg->src), err->message);
+    LOG("Debugging information: %s\n", debug_info ? debug_info : "none");
     g_clear_error(&err);
     g_free(debug_info);
 
@@ -474,7 +474,7 @@ static void video_output_gst_error_cb(GstBus *bus, GstMessage *msg, VideoOutput 
 
 static void video_output_gst_eos_cb(GstBus *bus, GstMessage *msg, VideoOutput *vo)
 {
-    g_print("End-Of-Stream reached.\n");
+    LOG("End-Of-Stream reached.\n");
     gst_element_set_state(vo->pipeline, GST_STATE_READY);
 }
 
@@ -592,7 +592,7 @@ void video_output_setup_pipeline(VideoOutput *vo)
     gst_bin_add_many(GST_BIN(vo->pipeline), source, decoder, vo->cairooverlay,
             vo->playsink, NULL);
     if (!gst_element_link(source, decoder)) {
-        g_printerr("Elements could not be linked. (source -> decoder)\n");
+        LOG("Elements could not be linked. (source -> decoder)\n");
     }
 
     GstPad *playsink_video_pad = gst_element_get_request_pad(vo->playsink, "video_sink");
@@ -601,12 +601,12 @@ void video_output_setup_pipeline(VideoOutput *vo)
     if (playsink_video_pad && videoconvert_pad) {
         ret = gst_pad_link(videoconvert_pad, playsink_video_pad);
         if (GST_PAD_LINK_FAILED(ret))
-            g_print("Linking overlay -> playsink failed\n");
+            LOG("Linking overlay -> playsink failed\n");
         else
-            g_print("Linking successful\n");
+            LOG("Linking successful\n");
     }
     else {
-        g_printerr("Could not request video pad or convert pad: %p, %p\n", playsink_video_pad, videoconvert_pad);
+        LOG("Could not request video pad or convert pad: %p, %p\n", playsink_video_pad, videoconvert_pad);
     }
 
     GstBus *bus = gst_element_get_bus(GST_ELEMENT(vo->pipeline));
