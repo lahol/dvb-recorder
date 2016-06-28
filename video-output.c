@@ -367,6 +367,11 @@ static void video_output_unknown_type_handler(GstElement *bin, GstPad *pad, GstC
     LOG("unknown type: %s\n", type);
 }
 
+static void video_output_decoder_drained_cb(GstElement *bin, VideoOutput *vo)
+{
+    LOG("decoder drained\n");
+}
+
 static void video_output_pad_added_handler(GstElement *src, GstPad *new_pad, VideoOutput *vo)
 {
     LOG("Pad added: %s from %s\n", GST_PAD_NAME(new_pad), GST_ELEMENT_NAME(src));
@@ -593,6 +598,8 @@ void video_output_setup_pipeline(VideoOutput *vo)
             G_CALLBACK(video_output_pad_added_handler), vo);
     g_signal_connect(G_OBJECT(decoder), "unknown-type",
             G_CALLBACK(video_output_unknown_type_handler), NULL);
+    g_signal_connect(G_OBJECT(decoder), "drained",
+            G_CALLBACK(video_output_decoder_drained_cb), vo);
 
     LOG("pipeline: %p, source: %p, decoder: %p\n",
             vo->pipeline, source, decoder);
