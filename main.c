@@ -21,6 +21,7 @@
 #include "ui-epg-list.h"
 #include "osd.h"
 
+#include "commands.h"
 #include "logging.h"
 
 struct {
@@ -304,7 +305,18 @@ static void main_ui_volume_value_changed(GtkScaleButton *button, gdouble value, 
 static gboolean main_key_event(GtkWidget *widget, GdkEventKey *event, gpointer data)
 {
     LOG("key event\n");
-    switch (event->keyval) {
+    if (event->type != GDK_KEY_RELEASE)
+        return FALSE;
+    gchar *dbg = gtk_accelerator_name(GDK_KEY_space, 0);
+    fprintf(stderr, "key: \"%s\"\n", dbg);
+    g_free(dbg);
+
+    Command *cmd = cmd_find(event->keyval, event->state);
+    if (!cmd)
+        return FALSE;
+
+    cmd_run(cmd);
+/*    switch (event->keyval) {
         case GDK_KEY_f:
             if (event->type == GDK_KEY_RELEASE)
                 main_toggle_fullscreen();
@@ -321,13 +333,13 @@ static gboolean main_key_event(GtkWidget *widget, GdkEventKey *event, gpointer d
             if (event->type == GDK_KEY_RELEASE)
                 main_action_toggle_mute();
             break;
-/*        case GDK_KEY_t:
+        case GDK_KEY_t:
             if (event->type == GDK_KEY_RELEASE)
                 dvb_recorder_set_channel(appdata.recorder, 0);
-            break;*/
+            break;
         default:
             return FALSE;
-    }
+    }*/
 
     return TRUE;
 }
@@ -814,6 +826,14 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
     }
 }
 
+void main_init_commands(void)
+{
+    cmd_add("::toggle_fullscreen", "f", (CmdCallbackProc)main_toggle_fullscreen, NULL);
+    cmd_add("::toggle_record", "r", (CmdCallbackProc)main_action_record, NULL);
+    cmd_add("::snapshot", "space", (CmdCallbackProc)main_action_snapshot, NULL);
+    cmd_add("::toggle_mute", "m", (CmdCallbackProc)main_action_toggle_mute, NULL);
+}
+
 int main(int argc, char **argv)
 {
     if (!XInitThreads()) {
@@ -863,6 +883,8 @@ int main(int argc, char **argv)
         LOG("record streams from config: 0x%x\n", ival);
         dvb_recorder_set_record_filter(appdata.recorder, ival);
     }
+
+    main_init_commands();
 
     main_init_window();
     main_init_control_dialog();
@@ -924,6 +946,8 @@ int main(int argc, char **argv)
     LOG("destroying recorder\n");
     dvb_recorder_destroy(appdata.recorder);
 
+    cmd_clear_list();
+
     config = g_build_filename(
             g_get_user_config_dir(),
             "dvb-recorder",
@@ -940,6 +964,7 @@ int main(int argc, char **argv)
         g_source_remove(appdata.hide_cursor_source);
     if (appdata.blank_cursor)
         g_object_unref(G_OBJECT(appdata.blank_cursor));
+
 
     LOG("done\n");
     return 0;
