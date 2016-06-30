@@ -307,39 +307,12 @@ static gboolean main_key_event(GtkWidget *widget, GdkEventKey *event, gpointer d
     LOG("key event\n");
     if (event->type != GDK_KEY_RELEASE)
         return FALSE;
-    gchar *dbg = gtk_accelerator_name(GDK_KEY_space, 0);
-    fprintf(stderr, "key: \"%s\"\n", dbg);
-    g_free(dbg);
 
-    Command *cmd = cmd_find(event->keyval, event->state);
+    Command *cmd = cmd_find(CMD_MODE_ANY, event->keyval, event->state);
     if (!cmd)
         return FALSE;
 
     cmd_run(cmd);
-/*    switch (event->keyval) {
-        case GDK_KEY_f:
-            if (event->type == GDK_KEY_RELEASE)
-                main_toggle_fullscreen();
-            break;
-        case GDK_KEY_r:
-            if (event->type == GDK_KEY_RELEASE)
-                main_action_record();
-            break;
-        case GDK_KEY_space:
-            if (event->type == GDK_KEY_RELEASE)
-                main_action_snapshot();
-            break;
-        case GDK_KEY_m:
-            if (event->type == GDK_KEY_RELEASE)
-                main_action_toggle_mute();
-            break;
-        case GDK_KEY_t:
-            if (event->type == GDK_KEY_RELEASE)
-                dvb_recorder_set_channel(appdata.recorder, 0);
-            break;
-        default:
-            return FALSE;
-    }*/
 
     return TRUE;
 }
@@ -826,12 +799,20 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
     }
 }
 
+void main_init_actions(void)
+{
+    cmd_action_register("toggle_fullscreen", (CmdCallbackProc)main_toggle_fullscreen, NULL);
+    cmd_action_register("toggle_record", (CmdCallbackProc)main_action_record, NULL);
+    cmd_action_register("snapshot", (CmdCallbackProc)main_action_snapshot, NULL);
+    cmd_action_register("toggle_mute", (CmdCallbackProc)main_action_toggle_mute, NULL);
+}
+
 void main_init_commands(void)
 {
-    cmd_add("::toggle_fullscreen", "f", (CmdCallbackProc)main_toggle_fullscreen, NULL);
-    cmd_add("::toggle_record", "r", (CmdCallbackProc)main_action_record, NULL);
-    cmd_add("::snapshot", "space", (CmdCallbackProc)main_action_snapshot, NULL);
-    cmd_add("::toggle_mute", "m", (CmdCallbackProc)main_action_toggle_mute, NULL);
+    cmd_add("toggle_fullscreen", "f");
+    cmd_add("toggle_record", "r");
+    cmd_add("snapshot", "space");
+    cmd_add("toggle_mute", "m");
 }
 
 int main(int argc, char **argv)
@@ -884,6 +865,7 @@ int main(int argc, char **argv)
         dvb_recorder_set_record_filter(appdata.recorder, ival);
     }
 
+    main_init_actions();
     main_init_commands();
 
     main_init_window();
@@ -947,6 +929,7 @@ int main(int argc, char **argv)
     dvb_recorder_destroy(appdata.recorder);
 
     cmd_clear_list();
+    cmd_action_cleanup();
 
     config = g_build_filename(
             g_get_user_config_dir(),
