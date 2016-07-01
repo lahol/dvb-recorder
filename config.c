@@ -1,5 +1,6 @@
 #include "config.h"
 #include <stdio.h>
+#include "commands.h"
 
 GKeyFile *_config_keyfile;
 
@@ -66,3 +67,33 @@ void config_set(gchar *group, gchar *key, CfgType type, gpointer value)
     }
 }
 
+void config_enum_bindings(CfgEnumBindingProc binding_cb, gpointer userdata)
+{
+    if (binding_cb == NULL || _config_keyfile == NULL)
+        return;
+    gchar **groups = g_key_file_get_groups(_config_keyfile, NULL);
+    gchar **keys = NULL;
+    CmdMode mode;
+    gchar *action;
+    guint i, j;
+
+    for (i = 0; groups[i]; ++i) {
+        if (!g_str_has_prefix(groups[i], "mode:"))
+            continue;
+        mode = cmd_mode_from_string(&groups[i][5]);
+        if (mode == CMD_MODE_INVALID)
+            continue;
+
+        keys = g_key_file_get_keys(_config_keyfile, groups[i], NULL, NULL);
+
+        for (j = 0; keys[j]; ++j) {
+            action = g_key_file_get_string(_config_keyfile, groups[i], keys[j], NULL);
+            binding_cb(mode, action, keys[j], userdata);
+            g_free(action);
+        }
+
+        g_strfreev(keys);
+    }
+
+    g_strfreev(groups);
+}

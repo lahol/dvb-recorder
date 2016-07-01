@@ -50,7 +50,7 @@ gint cmd_compare_keys(Command *a, Command *b)
     return 0;
 }
 
-Command *cmd_add(const gchar *action_name, const gchar *accelerator)
+Command *cmd_add(CmdMode mode, const gchar *action_name, const gchar *accelerator)
 {
     guint keyval;
     GdkModifierType modifiers;
@@ -65,7 +65,7 @@ Command *cmd_add(const gchar *action_name, const gchar *accelerator)
         return NULL;
     }
 
-    Command *cmd = cmd_find(CMD_MODE_ANY, keyval, modifiers);
+    Command *cmd = cmd_find(mode, keyval, modifiers);
     if (cmd) {
         LOG("command for %s, overwriting it.\n", accelerator);
         cmd_commands = g_list_remove(cmd_commands, cmd);
@@ -76,7 +76,7 @@ Command *cmd_add(const gchar *action_name, const gchar *accelerator)
 
     cmd->keyval = keyval;
     cmd->modifiers = modifiers;
-    cmd->mode = CMD_MODE_ANY;
+    cmd->mode = mode;
     cmd->action = action;
 
     cmd_commands = g_list_insert_sorted(cmd_commands, cmd, (GCompareFunc)cmd_compare_keys);
@@ -147,3 +147,35 @@ void cmd_action_cleanup(void)
     g_list_free_full(cmd_actions, (GDestroyNotify)g_free);
     cmd_actions = NULL;
 }
+
+CmdMode cmd_mode_from_string(const gchar *mode_str)
+{
+    gchar *mode_str_lower = g_utf8_strdown(mode_str, -1);
+
+    CmdMode mode = CMD_MODE_INVALID;
+    if (g_strcmp0(mode_str_lower, "any") == 0)
+        mode = CMD_MODE_ANY;
+    else if (g_strcmp0(mode_str_lower, "normal") == 0)
+        mode = CMD_MODE_NORMAL;
+    else if (g_strcmp0(mode_str_lower, "fullscreen") == 0)
+        mode = CMD_MODE_FULLSCREEN;
+
+    g_free(mode_str_lower);
+
+    return mode;
+}
+
+gchar *cmd_mode_to_string(CmdMode mode)
+{
+    switch (mode) {
+        case CMD_MODE_ANY:
+            return g_strdup("any");
+        case CMD_MODE_NORMAL:
+            return g_strdup("normal");
+        case CMD_MODE_FULLSCREEN:
+            return g_strdup("fullscreen");
+        default:
+            return g_strdup("invalid");
+    }
+}
+

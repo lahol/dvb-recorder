@@ -807,12 +807,10 @@ void main_init_actions(void)
     cmd_action_register("toggle_mute", (CmdCallbackProc)main_action_toggle_mute, NULL);
 }
 
+
 void main_init_commands(void)
 {
-    cmd_add("toggle_fullscreen", "f");
-    cmd_add("toggle_record", "r");
-    cmd_add("snapshot", "space");
-    cmd_add("toggle_mute", "m");
+    config_enum_bindings((CfgEnumBindingProc)cmd_add, NULL);
 }
 
 int main(int argc, char **argv)

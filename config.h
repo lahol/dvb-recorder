@@ -13,3 +13,8 @@ gint config_save(gchar *conffile);
 void config_free(void);
 gint config_get(gchar *group, gchar *key, CfgType type, gpointer value);
 void config_set(gchar *group, gchar *key, CfgType type, gpointer value);
+
+
+typedef void (*CfgEnumBindingProc)(guint, const gchar *, const gchar *, gpointer);
+void config_enum_bindings(CfgEnumBindingProc binding_cb, gpointer userdata);
+
