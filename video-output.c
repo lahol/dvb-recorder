@@ -35,6 +35,7 @@ struct _VideoOutput {
     GstElement *vsink;
     GstElement *playsink;
     GstElement *cairooverlay;
+    GstElement *asink;
     guint width;
     guint height;
     gdouble pixel_aspect;
@@ -570,10 +571,13 @@ void video_output_setup_pipeline(VideoOutput *vo)
     vo->vsink = gst_element_factory_make("xvimagesink", "xvimagesink");
     g_object_set(G_OBJECT(vo->vsink), "force-aspect-ratio", TRUE, NULL);
 
+    vo->asink = gst_element_factory_make("alsasink", "alsasink");
+
     LOG("make playsink\n");
     vo->playsink = gst_element_factory_make("playsink", "playsink");
     g_object_set(G_OBJECT(vo->playsink),
             "video-sink", vo->vsink,
+            "audio-sink", vo->asink,
             "volume", vo->volume,
             "mute", vo->is_muted,
             NULL);
