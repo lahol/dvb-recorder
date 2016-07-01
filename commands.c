@@ -55,8 +55,10 @@ Command *cmd_add(CmdMode mode, const gchar *action_name, const gchar *accelerato
     guint keyval;
     GdkModifierType modifiers;
     gtk_accelerator_parse(accelerator, &keyval, &modifiers);
-    if (keyval == 0 && modifiers == 0)
+    if (keyval == 0 && modifiers == 0) {
+        LOG("could not parse binding: %s\n", accelerator);
         return NULL;
+    }
 
     /* FIXME: action_name in the form mode::action or action */
     CmdAction *action = cmd_action_get(action_name);
@@ -80,6 +82,10 @@ Command *cmd_add(CmdMode mode, const gchar *action_name, const gchar *accelerato
     cmd->action = action;
 
     cmd_commands = g_list_insert_sorted(cmd_commands, cmd, (GCompareFunc)cmd_compare_keys);
+
+    gchar *mode_str = cmd_mode_to_string(mode);
+    LOG("added binding %s for mode %s as %s\n", accelerator, mode_str, action_name);
+    g_free(mode_str);
 
     return cmd;
 }
