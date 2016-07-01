@@ -78,9 +78,9 @@ void config_enum_bindings(CfgEnumBindingProc binding_cb, gpointer userdata)
     guint i, j;
 
     for (i = 0; groups[i]; ++i) {
-        if (!g_str_has_prefix(groups[i], "mode:"))
+        if (!g_str_has_prefix(groups[i], "binding:"))
             continue;
-        mode = cmd_mode_from_string(&groups[i][5]);
+        mode = cmd_mode_from_string(&groups[i][8]);
         if (mode == CMD_MODE_INVALID)
             continue;
 

@@ -55,6 +55,8 @@ struct {
     guint32 notified_channel_change : 1;
     guint32 ignore_events : 1;
 
+    CmdMode command_mode;
+
     guint hide_cursor_source;
     GTimer *hide_cursor_timer;
     GdkCursor *blank_cursor;
@@ -153,6 +155,8 @@ void main_window_status_set_fullscreen(gboolean fullscreen)
         appdata.hide_cursor_timer = g_timer_new();
         g_timer_start(appdata.hide_cursor_timer);
         appdata.hide_cursor_source = g_idle_add(main_check_mouse_motion, NULL);
+
+        appdata.command_mode = CMD_MODE_FULLSCREEN;
     }
     else {
         main_window_status_set_visible(widgets.channels_dialog, &appstatus.gui.channels_dialog, TRUE);
@@ -162,6 +166,8 @@ void main_window_status_set_fullscreen(gboolean fullscreen)
         appstatus.gui.main_window.fullscreen = 0;
 
         gdk_window_set_cursor(gtk_widget_get_window(widgets.main_window), NULL);
+
+        appdata.command_mode = CMD_MODE_NORMAL;
     }
 
     /* focus main window */
@@ -308,7 +314,7 @@ static gboolean main_key_event(GtkWidget *widget, GdkEventKey *event, gpointer d
     if (event->type != GDK_KEY_RELEASE)
         return FALSE;
 
-    Command *cmd = cmd_find(CMD_MODE_ANY, event->keyval, event->state);
+    Command *cmd = cmd_find(appdata.command_mode, event->keyval, event->state);
     if (!cmd)
         return FALSE;
 
@@ -865,6 +871,8 @@ int main(int argc, char **argv)
 
     main_init_actions();
     main_init_commands();
+
+    appdata.command_mode = CMD_MODE_NORMAL;
 
     main_init_window();
     main_init_control_dialog();

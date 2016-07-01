@@ -19,7 +19,7 @@
  * configure adapt window size to content
  * teletext
  ✔ osd (subtitles, change of program, status)
- * configure keyboard shortcuts
+ ✔ configure keyboard shortcuts
  * handle multiple audio
  * select audio channel
  * [lib+scan] support satellites Astra 19.2 E (S19E2), Hotbird 13.0 E (S13E0), Eurobird 9.0 E (S9E0 – 9.0 east Eurobird 9); make this configurable (get list via w_scan -c?)
@@ -32,8 +32,8 @@
  * select channels with arrow keys, pgup, pgdown (config: tune in immediately or not)
  * show red record symbol and duration
  * scheduled recording with epg
- * tooltips for buttons/symbols
- * fullscreen -> normal via esc
+ ✔ tooltips for buttons/symbols
+ ✔ fullscreen -> normal via esc (via configurable command modes)
  * terminate program with escape (warn if recording is running or planned)
  * index entries in channel and fav-list consequtively)
  * fixed numbers for channels configurable (to sync with other devices)
@@ -44,4 +44,4 @@
  * volume to low?
  * snapshot: show filename
  ✔ set permissions for recordings (a+r)
- ✔? BUG: hotbird -> snapshot -> crash
+ ✔ BUG: hotbird -> snapshot -> crash
