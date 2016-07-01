@@ -371,14 +371,13 @@ void main_menu_show_control_dialog(gpointer userdata)
     main_window_status_toggle_show(widgets.control_dialog, &appstatus.gui.control_dialog);
 }
 
-void main_menu_quit(gpointer userdata)
+void main_action_quit(gpointer userdata)
 {
-    LOG("Menu > Quit\n");
     DVBRecorderRecordStatus recstatus;
 
     dvb_recorder_query_record_status(appdata.recorder, &recstatus);
     if (recstatus.status == DVB_RECORD_STATUS_RECORDING) {
-        GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(widgets.channels_dialog),
+        GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(widgets.main_window),
                 GTK_DIALOG_DESTROY_WITH_PARENT,
                 GTK_MESSAGE_WARNING,
                 GTK_BUTTONS_YES_NO,
@@ -456,7 +455,7 @@ GtkWidget *main_create_context_menu(void)
 
     item = gtk_menu_item_new_with_label(_("Quit"));
     g_signal_connect_swapped(G_OBJECT(item), "activate",
-            G_CALLBACK(main_menu_quit), NULL);
+            G_CALLBACK(main_action_quit), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(popup), item);
 
     gtk_widget_show_all(popup);
@@ -486,10 +485,10 @@ GtkWidget *main_create_main_menu(void)
 
     item = gtk_menu_item_new_with_label(_("Quit"));
     g_signal_connect_swapped(G_OBJECT(item), "activate",
-            G_CALLBACK(main_menu_quit), NULL);
+            G_CALLBACK(main_action_quit), NULL);
     _main_add_accelerator(item, "activate", widgets.accelerator_group, GDK_KEY_q,
             GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE,
-            G_CALLBACK(main_menu_quit), NULL);
+            G_CALLBACK(main_action_quit), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
 
     item = gtk_menu_item_new_with_label(_("File"));
@@ -815,6 +814,7 @@ void main_init_actions(void)
     cmd_action_register("toggle_record", (CmdCallbackProc)main_action_record, NULL);
     cmd_action_register("snapshot", (CmdCallbackProc)main_action_snapshot, NULL);
     cmd_action_register("toggle_mute", (CmdCallbackProc)main_action_toggle_mute, NULL);
+    cmd_action_register("quit", (CmdCallbackProc)main_action_quit, NULL);
 }
 
 

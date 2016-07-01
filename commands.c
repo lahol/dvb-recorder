@@ -68,7 +68,8 @@ Command *cmd_add(CmdMode mode, const gchar *action_name, const gchar *accelerato
     }
 
     Command *cmd = cmd_find(mode, keyval, modifiers);
-    if (cmd) {
+    /* only overwrite if mode matches exactly (find returns any) */
+    if (cmd && cmd->mode == mode) {
         LOG("command for %s, overwriting it.\n", accelerator);
         cmd_commands = g_list_remove(cmd_commands, cmd);
     }
