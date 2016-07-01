@@ -143,7 +143,7 @@ CmdAction *cmd_action_get(const gchar *action_name)
 {
     GQuark action_quark = g_quark_from_string(action_name);
 
-    GList *entry = g_list_find_custom(cmd_actions, (gconstpointer)action_quark, (GCompareFunc)cmd_action_compare_quark);
+    GList *entry = g_list_find_custom(cmd_actions, GUINT_TO_POINTER((guint)action_quark), (GCompareFunc)cmd_action_compare_quark);
 
     return (entry ? (CmdAction *)entry->data : NULL);
 }
