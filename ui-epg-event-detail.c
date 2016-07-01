@@ -99,8 +99,10 @@ static void populate_widget(UiEpgEventDetail *self)
     gtk_text_view_set_justification(GTK_TEXT_VIEW(self->priv->description), GTK_JUSTIFY_FILL);
     gtk_text_view_set_left_margin(GTK_TEXT_VIEW(self->priv->description), 5);
     gtk_text_view_set_right_margin(GTK_TEXT_VIEW(self->priv->description), 13);
+#if GTK_CHECK_VERSION(3, 18, 0)
     gtk_text_view_set_top_margin(GTK_TEXT_VIEW(self->priv->description), 2);
     gtk_text_view_set_bottom_margin(GTK_TEXT_VIEW(self->priv->description), 2);
+#endif
 
     gtk_box_pack_start(GTK_BOX(vbox), self->priv->title_label, FALSE, FALSE, 0);
 
