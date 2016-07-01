@@ -107,7 +107,11 @@ void main_window_status_toggle_show(GtkWidget *window, GuiWindowStatus *status)
 gboolean main_check_mouse_motion(gpointer data)
 {
     if (!appdata.blank_cursor)
+#if GTK_CHECK_VERSION(3, 16, 0)
         appdata.blank_cursor = gdk_cursor_new_from_name(gdk_display_get_default(), "none");
+#else
+        appdata.blank_cursor = gdk_cursor_new(GDK_BLANK_CURSOR);
+#endif
     if (!appstatus.gui.main_window.fullscreen) {
         gdk_window_set_cursor(gtk_widget_get_window(widgets.main_window), NULL);
         if (appdata.hide_cursor_timer) {
