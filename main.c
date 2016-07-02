@@ -23,6 +23,7 @@
 
 #include "commands.h"
 #include "logging.h"
+#include "utils.h"
 
 struct {
     GtkWidget *main_window;
@@ -42,6 +43,8 @@ struct {
         GtkWidget *mute;
     } buttons;
 
+    GtkWidget *status_label;
+
     GtkAccelGroup *accelerator_group;
 } widgets;
 
@@ -59,6 +62,7 @@ struct {
 
     guint hide_cursor_source;
     GTimer *hide_cursor_timer;
+    guint record_status_update_source;
     GdkCursor *blank_cursor;
 } appdata;
 
@@ -68,6 +72,7 @@ GtkWidget *main_create_context_menu(void);
 void main_recorder_channel_selected_cb(UiSidebarChannels *sidebar, guint channel_id, gpointer userdata);
 void main_recorder_favourites_list_changed_cb(UiSidebarChannels *sidebar, guint fav_list_id, gpointer userdata);
 gboolean main_dialog_delete_event(GtkWidget *widget, GdkEvent *event, gpointer userdata);
+gboolean main_update_record_status(gpointer userdata);
 
 void main_window_status_set_visible(GtkWidget *window, GuiWindowStatus *status, gboolean is_visible)
 {
@@ -271,6 +276,7 @@ void main_action_record(void)
     else {
         LOG("Start recording.\n");
         dvb_recorder_record_start(appdata.recorder);
+        appdata.record_status_update_source = g_timeout_add_seconds(1, main_update_record_status, NULL);
     }
 }
 
@@ -396,6 +402,26 @@ void main_action_quit(gpointer userdata)
     }
 
     gtk_main_quit();
+}
+
+gboolean main_update_record_status(gpointer userdata)
+{
+    DVBRecorderRecordStatus recstatus;
+    dvb_recorder_query_record_status(appdata.recorder, &recstatus);
+    gchar tbuf[256];
+    gchar *markup;
+    util_duration_to_string(tbuf, 256, recstatus.elapsed_time);
+    if (recstatus.status == DVB_RECORD_STATUS_RECORDING) {
+        markup = g_markup_printf_escaped("<span size=\"48000\" color=\"red\">R: %s</span>", tbuf);
+    }
+    else {
+        markup = g_markup_printf_escaped("<span size=\"48000\" color=\"red\">S: %s</span>", tbuf);
+    }
+
+    gtk_label_set_markup(GTK_LABEL(widgets.status_label), markup);
+    g_free(markup);
+
+    return (gboolean)(recstatus.status == DVB_RECORD_STATUS_RECORDING);
 }
 
 void main_menu_show_favourites_dialog(void)
@@ -652,6 +678,10 @@ void main_init_control_dialog(void)
 
     GtkWidget *button_bar = main_init_channels_dialog_buttons();
     gtk_box_pack_start(GTK_BOX(content), button_bar, FALSE, FALSE, 0);
+
+    widgets.status_label = gtk_label_new("Ready");
+    gtk_label_set_markup(GTK_LABEL(widgets.status_label), "<span size=\"48000\"></span>");
+    gtk_box_pack_start(GTK_BOX(content), widgets.status_label, TRUE, TRUE, 0);
 
     main_position_dialog(widgets.control_dialog, &appstatus.gui.control_dialog, 130, 60);
 

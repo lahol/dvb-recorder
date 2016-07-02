@@ -45,3 +45,5 @@
  * snapshot: show filename
  ✔ set permissions for recordings (a+r)
  ✔ BUG: hotbird -> snapshot -> crash
+ * saturation/hue/brightness adjust (xvimagesink)
+ * use queue? for signal loss and resyncing
