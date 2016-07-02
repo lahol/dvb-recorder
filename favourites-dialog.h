@@ -42,5 +42,6 @@ typedef void (*CHANNEL_FAVOURITES_DIALOG_UPDATE_NOTIFY)(gpointer userdata);
 void channel_favourites_dialog_set_update_notify(ChannelFavouritesDialog *dialog,
         CHANNEL_FAVOURITES_DIALOG_UPDATE_NOTIFY cb, gpointer userdata);
 gboolean channel_favourites_dialog_write_favourite_lists(ChannelFavouritesDialog *dialog);
+void channel_favourites_dialog_set_current_list(ChannelFavouritesDialog *dialog, guint32 list_id);
 
 G_END_DECLS

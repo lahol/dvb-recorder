@@ -37,6 +37,7 @@ struct _ChannelFavouritesDialogPrivate {
 
     GtkWidget *channel_fav_list;
     GtkWidget *channel_all_list;
+    GtkWidget *favourites_combo;
 
     GtkWindow *parent;
     DVBRecorder *recorder;
@@ -744,16 +745,16 @@ static void channel_favourites_dialog_init(ChannelFavouritesDialog *self)
     GtkWidget *hbox;
     hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 1);
 
-    GtkWidget *combo = gtk_combo_box_new_with_model(GTK_TREE_MODEL(self->priv->favourites));
+    self->priv->favourites_combo = gtk_combo_box_new_with_model(GTK_TREE_MODEL(self->priv->favourites));
     GtkCellRenderer *renderer = gtk_cell_renderer_text_new();
 
-    gtk_cell_layout_pack_start(GTK_CELL_LAYOUT(combo), renderer, TRUE);
-    gtk_cell_layout_set_attributes(GTK_CELL_LAYOUT(combo), renderer, "text", FAV_ROW_TITLE, NULL);
+    gtk_cell_layout_pack_start(GTK_CELL_LAYOUT(self->priv->favourites_combo), renderer, TRUE);
+    gtk_cell_layout_set_attributes(GTK_CELL_LAYOUT(self->priv->favourites_combo), renderer, "text", FAV_ROW_TITLE, NULL);
 
-    g_signal_connect(G_OBJECT(combo), "changed",
+    g_signal_connect(G_OBJECT(self->priv->favourites_combo), "changed",
             G_CALLBACK(channel_favourites_dialog_list_changed), self);
 
-    gtk_box_pack_start(GTK_BOX(hbox), combo, TRUE, TRUE, 3);
+    gtk_box_pack_start(GTK_BOX(hbox), self->priv->favourites_combo, TRUE, TRUE, 3);
 
     GtkWidget *button = gtk_button_new_with_label("Add list");
     g_signal_connect_swapped(G_OBJECT(button), "clicked",
@@ -839,3 +840,38 @@ void channel_favourites_dialog_set_update_notify(ChannelFavouritesDialog *dialog
     dialog->priv->update_notify_cb = cb;
     dialog->priv->update_notify_data = userdata;
 }
+
+gboolean channel_favourites_dialog_find_list_by_id(ChannelFavouritesDialog *dialog, guint32 list_id, GtkTreeIter *match)
+{
+    g_return_val_if_fail(IS_CHANNEL_FAVOURITES_DIALOG(dialog), FALSE);
+
+    GtkTreeIter iter;
+    gboolean valid;
+    guint32 row_id;
+
+    for (valid = gtk_tree_model_get_iter_first(GTK_TREE_MODEL(dialog->priv->favourites), &iter);
+         valid;
+         valid = gtk_tree_model_iter_next(GTK_TREE_MODEL(dialog->priv->favourites), &iter)) {
+        gtk_tree_model_get(GTK_TREE_MODEL(dialog->priv->favourites), &iter, FAV_ROW_ID, &row_id, -1);
+        if (row_id == list_id) {
+            if (match)
+                *match = iter;
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+void channel_favourites_dialog_set_current_list(ChannelFavouritesDialog *dialog, guint32 list_id)
+{
+    g_return_if_fail(IS_CHANNEL_FAVOURITES_DIALOG(dialog));
+
+    GtkTreeIter iter;
+
+    if (!channel_favourites_dialog_find_list_by_id(dialog, list_id, &iter))
+        return;
+
+    gtk_combo_box_set_active_iter(GTK_COMBO_BOX(dialog->priv->favourites_combo), &iter);
+}
+

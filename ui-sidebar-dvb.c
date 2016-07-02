@@ -283,15 +283,12 @@ gboolean ui_sidebar_channels_find_list_by_id(UiSidebarChannels *sidebar, guint32
 
     GtkTreeIter iter;
     gboolean valid;
-    GValue value = G_VALUE_INIT;
     guint32 row_id;
    
     for (valid = gtk_tree_model_get_iter_first(GTK_TREE_MODEL(sidebar->priv->favourites_list_store), &iter);
          valid;
          valid = gtk_tree_model_iter_next(GTK_TREE_MODEL(sidebar->priv->favourites_list_store), &iter)) {
-        gtk_tree_model_get_value(GTK_TREE_MODEL(sidebar->priv->favourites_list_store), &iter, FAV_ROW_ID, &value);
-        row_id = g_value_get_uint(&value);
-        g_value_unset(&value);
+        gtk_tree_model_get(GTK_TREE_MODEL(sidebar->priv->favourites_list_store), &iter, FAV_ROW_ID, &row_id, -1);
         if (row_id == id) {
             if (match)
                 *match = iter;

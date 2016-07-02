@@ -427,6 +427,7 @@ gboolean main_update_record_status(gpointer userdata)
 void main_menu_show_favourites_dialog(void)
 {
     favourites_dialog_show(widgets.main_window, appdata.recorder,
+            ui_sidebar_channels_get_current_list(UI_SIDEBAR_CHANNELS(widgets.channel_list)),
             (CHANNEL_FAVOURITES_DIALOG_UPDATE_NOTIFY)ui_sidebar_channels_update_favourites,
             widgets.channel_list);
 }

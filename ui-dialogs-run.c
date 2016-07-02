@@ -21,12 +21,15 @@ GtkResponseType ui_dialog_scan_show(GtkWidget *parent, DVBRecorder *recorder)
     return result;
 }
 
-void favourites_dialog_show(GtkWidget *parent, DVBRecorder *recorder,
+void favourites_dialog_show(GtkWidget *parent, DVBRecorder *recorder, guint32 list_id,
                             CHANNEL_FAVOURITES_DIALOG_UPDATE_NOTIFY notify_cb, gpointer userdata)
 {
     GtkWidget *dialog = channel_favourites_dialog_new(GTK_WINDOW(parent));
     g_object_set(G_OBJECT(dialog), "recorder", recorder, NULL);
     channel_favourites_dialog_set_update_notify(CHANNEL_FAVOURITES_DIALOG(dialog), notify_cb, userdata);
+
+    fprintf(stderr, "set list id: %u\n", list_id);
+    channel_favourites_dialog_set_current_list(CHANNEL_FAVOURITES_DIALOG(dialog), list_id);
 
     GtkResponseType result = gtk_dialog_run(GTK_DIALOG(dialog));
 
