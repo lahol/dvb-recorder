@@ -4,6 +4,7 @@
 
 #include "channel-list.h"
 #include "favourites-dialog.h"
+#include "config.h"
 
 #include <dvbrecorder/channel-db.h>
 
@@ -103,31 +104,35 @@ static void _ui_sidebar_channels_channel_row_activated(UiSidebarChannels *sideba
 
     gtk_tree_model_get(model, &iter, CHNL_ROW_ID, &selection_id, -1);
 
-    /* get data from db */
-/*    ChannelData *chdata = channel_db_get_channel(selection_id);
-    if (chdata) {
-        fprintf(stderr, "found channel, tuning in\n");*/
+    g_signal_emit(sidebar, ui_sidebar_signals[SIGNAL_CHANNEL_SELECTED], 0, selection_id);
+}
+
+static void _ui_sidebar_channels_channel_cursor_changed(UiSidebarChannels *sidebar, GtkTreeView *tree_view)
+{
+    gboolean cfg_channel_change_on_select = FALSE;
+    if (config_get("main", "channel-change-on-select", CFG_TYPE_BOOLEAN, &cfg_channel_change_on_select) != 0)
+        return;
+    if (!cfg_channel_change_on_select)
+        return;
+
+    GtkTreePath *path = NULL;
+    gtk_tree_view_get_cursor(tree_view, &path, NULL);
+
+    if (!path)
+        return;
+
+    GtkTreeIter iter;
+    GtkTreeModel *model = gtk_tree_view_get_model(tree_view);
+    if (model == NULL || !gtk_tree_model_get_iter(model, &iter, path))
+        return;
+
+    guint32 selection_id;
+
+    gtk_tree_model_get(model, &iter, CHNL_ROW_ID, &selection_id, -1);
+
+    gtk_tree_path_free(path);
 
     g_signal_emit(sidebar, ui_sidebar_signals[SIGNAL_CHANNEL_SELECTED], 0, selection_id);
-
-/*    }*/
-#if 0
-    if (chdata) {
-        MediaSource *source = media_source_new(MS_TYPE_DVB);
-
-        ((MediaSourceDVB *)source)->key = channel_convert_name_to_xine(chdata);
-        ((MediaSourceDVB *)source)->frequency = chdata->frequency;
-        ((MediaSourceDVB *)source)->symbolrate = chdata->srate;
-
-        backend_stream_open(backend, source);
-
-        media_source_free(source);
-    }
-
-    if (backend_stream_get_status(backend) & BSS_PLAYING) {
-        backend_stream_play(backend);
-    }
-#endif
 }
 
 GtkListStore *_ui_sidebar_channels_create_favourites_list_store(void)
@@ -202,6 +207,8 @@ static void populate_widget(UiSidebarChannels *self)
     GtkTreeView *tv = channel_list_get_tree_view(CHANNEL_LIST(self->priv->channel_list));
     g_signal_connect_swapped(G_OBJECT(tv), "row-activated",
             G_CALLBACK(_ui_sidebar_channels_channel_row_activated), self);
+    g_signal_connect_swapped(G_OBJECT(tv), "cursor-changed",
+            G_CALLBACK(_ui_sidebar_channels_channel_cursor_changed), self);
 
     gtk_box_pack_start(GTK_BOX(vbox), self->priv->channel_list, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(vbox), self->priv->favourites_list_widget, FALSE, FALSE, 0);

@@ -4,7 +4,8 @@
 
 typedef enum {
     CFG_TYPE_STRING,
-    CFG_TYPE_INT
+    CFG_TYPE_INT,
+    CFG_TYPE_BOOLEAN
 } CfgType;
 
 gint config_read_cmdline(int *pargc, char ***pargv);

@@ -29,12 +29,12 @@
  * epg-list: on update, do not loose current selection (if still available)
 
  * select last favourites list after restart, as well as last chosen channel
- * select channels with arrow keys, pgup, pgdown (config: tune in immediately or not)
+ ✔ select channels with arrow keys, pgup, pgdown (config: tune in immediately or not)
  * show red record symbol and duration
  * scheduled recording with epg
  ✔ tooltips for buttons/symbols
  ✔ fullscreen -> normal via esc (via configurable command modes)
- * terminate program with escape (warn if recording is running or planned)
+ ✔ terminate program with escape (warn if recording is running or planned) [done with custom bindings]
  * index entries in channel and fav-list consequtively)
  * fixed numbers for channels configurable (to sync with other devices)
  * edit channel list: select current fav-list

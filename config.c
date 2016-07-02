@@ -46,6 +46,13 @@ gint config_get(gchar *group, gchar *key, CfgType type, gpointer value)
         case CFG_TYPE_INT:
             *((gint *)value) = g_key_file_get_integer(_config_keyfile, group, key, &err);
             break;
+        case CFG_TYPE_BOOLEAN:
+            *((gboolean *)value) = g_key_file_get_boolean(_config_keyfile, group, key, &err);
+            if (err && err->code == G_KEY_FILE_ERROR_KEY_NOT_FOUND) {
+                g_error_free(err);
+                err = NULL;
+            }
+            break;
     }
     if (err != NULL) {
         fprintf(stderr, "config_get: %s\n", err->message);
@@ -63,6 +70,9 @@ void config_set(gchar *group, gchar *key, CfgType type, gpointer value)
             break;
         case CFG_TYPE_INT:
             g_key_file_set_integer(_config_keyfile, group, key, GPOINTER_TO_INT(value));
+            break;
+        case CFG_TYPE_BOOLEAN:
+            g_key_file_set_boolean(_config_keyfile, group, key, (gboolean)GPOINTER_TO_INT(value));
             break;
     }
 }
