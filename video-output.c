@@ -572,6 +572,7 @@ void video_output_setup_pipeline(VideoOutput *vo)
     g_object_set(G_OBJECT(vo->vsink), "force-aspect-ratio", TRUE, NULL);
 
     vo->asink = gst_element_factory_make("alsasink", "alsasink");
+    LOG("audiosink: %p\n", vo->asink);
 
     LOG("make playsink\n");
     vo->playsink = gst_element_factory_make("playsink", "playsink");
