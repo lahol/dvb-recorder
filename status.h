@@ -22,6 +22,7 @@ typedef struct {
 
 typedef struct {
     guint channel_id;
+    guint fav_list_id;
     gdouble volume;
     guint32 mute : 1;
     guint32 running : 1;

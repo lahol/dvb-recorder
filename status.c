@@ -20,6 +20,7 @@ void status_save_recorder_data(GKeyFile *kf, RecorderStatus *status)
         return;
 
     g_key_file_set_uint64(kf, "Recorder", "channel-id", (guint64)status->channel_id);
+    g_key_file_set_uint64(kf, "Recorder", "fav-list-id", (guint64)status->fav_list_id);
     g_key_file_set_double(kf, "Recorder", "volume", status->volume);
     g_key_file_set_boolean(kf, "Recorder", "mute", status->mute);
     g_key_file_set_boolean(kf, "Recorder", "running", status->running);
@@ -70,6 +71,7 @@ void status_restore_recorder_data(GKeyFile *kf, RecorderStatus *status)
     }
 
     status->channel_id = (guint)g_key_file_get_uint64(kf, "Recorder", "channel-id", NULL);
+    status->fav_list_id = (guint)g_key_file_get_uint64(kf, "Recorder", "fav-list-id", NULL);
     status->volume = g_key_file_get_double(kf, "Recorder", "volume", NULL);
     status->mute = g_key_file_get_boolean(kf, "Recorder", "mute", NULL);
     status->running = g_key_file_get_boolean(kf, "Recorder", "running", NULL);

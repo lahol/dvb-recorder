@@ -66,6 +66,7 @@ AppStatus appstatus;
 
 GtkWidget *main_create_context_menu(void);
 void main_recorder_channel_selected_cb(UiSidebarChannels *sidebar, guint channel_id, gpointer userdata);
+void main_recorder_favourites_list_changed_cb(UiSidebarChannels *sidebar, guint fav_list_id, gpointer userdata);
 gboolean main_dialog_delete_event(GtkWidget *widget, GdkEvent *event, gpointer userdata);
 
 void main_window_status_set_visible(GtkWidget *window, GuiWindowStatus *status, gboolean is_visible)
@@ -600,6 +601,8 @@ void main_init_channels_dialog(void)
     widgets.channel_list = ui_sidebar_channels_new();
     g_signal_connect(G_OBJECT(widgets.channel_list), "channel-selected",
             G_CALLBACK(main_recorder_channel_selected_cb), NULL);
+    g_signal_connect(G_OBJECT(widgets.channel_list), "favourites-list-changed",
+            G_CALLBACK(main_recorder_favourites_list_changed_cb), NULL);
 
 
     gtk_box_pack_start(GTK_BOX(content), widgets.channel_list, TRUE, TRUE, 0);
@@ -688,6 +691,11 @@ void main_recorder_channel_selected_cb(UiSidebarChannels *sidebar, guint channel
     /*
     gtk_window_present(GTK_WINDOW(widgets.main_window));
     */
+}
+
+void main_recorder_favourites_list_changed_cb(UiSidebarChannels *sidebar, guint fav_list_id, gpointer userdata)
+{
+    appstatus.recorder.fav_list_id = fav_list_id;
 }
 
 void main_ui_update_button_status(void)
@@ -923,6 +931,8 @@ int main(int argc, char **argv)
 
         if (appstatus.recorder.running)
             dvb_recorder_set_channel(appdata.recorder, appstatus.recorder.channel_id);
+        ui_sidebar_channels_set_current_list(UI_SIDEBAR_CHANNELS(widgets.channel_list), appstatus.recorder.fav_list_id);
+        ui_sidebar_channels_set_current_channel(UI_SIDEBAR_CHANNELS(widgets.channel_list), appstatus.recorder.channel_id, FALSE);
     }
 
     gtk_main();

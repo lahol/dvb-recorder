@@ -33,4 +33,9 @@ GtkWidget *ui_sidebar_channels_new(void);
 
 void ui_sidebar_channels_update_favourites(UiSidebarChannels *sidebar);
 
+guint32 ui_sidebar_channels_get_current_list(UiSidebarChannels *sidebar);
+void ui_sidebar_channels_set_current_list(UiSidebarChannels *sidebar, guint32 id);
+guint32 ui_sidebar_channels_get_current_channel(UiSidebarChannels *sidebar);
+void ui_sidebar_channels_set_current_channel(UiSidebarChannels *sidebar, guint32 id, gboolean activate);
+
 G_END_DECLS
