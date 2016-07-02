@@ -23,11 +23,56 @@ struct _Command {
 GList *cmd_actions = NULL;
 GList *cmd_commands = NULL;
 
+Command *cmd_find_full(CmdMode mode, guint keyval, GdkModifierType modifiers, GCompareFunc compare_func);
+gint cmd_compare_keys(Command *a, Command *b);
+gint cmd_compare_keys_exact(Command *a, Command *b);
+
 void cmd_free(Command *cmd)
 {
     if (cmd) {
         g_free(cmd);
     }
+}
+
+Command *cmd_add(CmdMode mode, const gchar *action_name, const gchar *accelerator)
+{
+    guint keyval;
+    GdkModifierType modifiers;
+    gtk_accelerator_parse(accelerator, &keyval, &modifiers);
+    if (keyval == 0 && modifiers == 0) {
+        LOG("could not parse binding: %s\n", accelerator);
+        return NULL;
+    }
+
+    /* FIXME: action_name in the form mode::action or action */
+    CmdAction *action = cmd_action_get(action_name);
+    if (!action) {
+        LOG("action %s not found. Not creating command %s\n", action_name, accelerator);
+        return NULL;
+    }
+
+    Command *cmd = cmd_find_full(mode, keyval, modifiers, (GCompareFunc)cmd_compare_keys_exact);
+    /* only overwrite if mode matches exactly (find returns any) */
+    if (cmd && cmd->mode == mode) {
+        LOG("command for %s, overwriting it.\n", accelerator);
+        cmd_commands = g_list_remove(cmd_commands, cmd);
+    }
+    else {
+        cmd = g_malloc0(sizeof(Command));
+    }
+
+    cmd->keyval = keyval;
+    cmd->modifiers = modifiers;
+    cmd->mode = mode;
+    cmd->action = action;
+
+    cmd_commands = g_list_insert_sorted(cmd_commands, cmd, (GCompareFunc)cmd_compare_keys_exact);
+
+    gchar *mode_str = cmd_mode_to_string(mode);
+    LOG("added binding %s for mode %s as %s\n", accelerator, mode_str, action_name);
+    g_free(mode_str);
+
+    return cmd;
 }
 
 gint cmd_compare_keys(Command *a, Command *b)
@@ -50,56 +95,29 @@ gint cmd_compare_keys(Command *a, Command *b)
     return 0;
 }
 
-Command *cmd_add(CmdMode mode, const gchar *action_name, const gchar *accelerator)
+gint cmd_compare_keys_exact(Command *a, Command *b)
 {
-    guint keyval;
-    GdkModifierType modifiers;
-    gtk_accelerator_parse(accelerator, &keyval, &modifiers);
-    if (keyval == 0 && modifiers == 0) {
-        LOG("could not parse binding: %s\n", accelerator);
-        return NULL;
-    }
-
-    /* FIXME: action_name in the form mode::action or action */
-    CmdAction *action = cmd_action_get(action_name);
-    if (!action) {
-        LOG("action %s not found. Not creating command %s\n", action_name, accelerator);
-        return NULL;
-    }
-
-    Command *cmd = cmd_find(mode, keyval, modifiers);
-    /* only overwrite if mode matches exactly (find returns any) */
-    if (cmd && cmd->mode == mode) {
-        LOG("command for %s, overwriting it.\n", accelerator);
-        cmd_commands = g_list_remove(cmd_commands, cmd);
-    }
-    else {
-        cmd = g_malloc0(sizeof(Command));
-    }
-
-    cmd->keyval = keyval;
-    cmd->modifiers = modifiers;
-    cmd->mode = mode;
-    cmd->action = action;
-
-    cmd_commands = g_list_insert_sorted(cmd_commands, cmd, (GCompareFunc)cmd_compare_keys);
-
-    gchar *mode_str = cmd_mode_to_string(mode);
-    LOG("added binding %s for mode %s as %s\n", accelerator, mode_str, action_name);
-    g_free(mode_str);
-
-    return cmd;
+    if (a->mode < b->mode)
+        return 1;
+    if (a->mode > b->mode)
+        return -1;
+    return cmd_compare_keys(a, b);
 }
 
-Command *cmd_find(CmdMode mode, guint keyval, GdkModifierType modifiers)
+Command *cmd_find_full(CmdMode mode, guint keyval, GdkModifierType modifiers, GCompareFunc compare_func)
 {
     Command compare;
     compare.keyval = keyval;
     compare.modifiers = modifiers;
     compare.mode = mode;
 
-    GList *entry = g_list_find_custom(cmd_commands, &compare, (GCompareFunc)cmd_compare_keys);
+    GList *entry = g_list_find_custom(cmd_commands, &compare, compare_func);
     return (entry ? (Command *)entry->data : NULL);
+}
+
+Command *cmd_find(CmdMode mode, guint keyval, GdkModifierType modifiers)
+{
+    return cmd_find_full(mode, keyval, modifiers, (GCompareFunc)cmd_compare_keys);
 }
 
 void cmd_run(Command *cmd)
