@@ -26,3 +26,8 @@ gdouble video_output_get_volume(VideoOutput *vo);
 
 void video_output_set_overlay_surface(VideoOutput *vo, cairo_surface_t *overlay);
 gboolean video_output_get_overlay_surface_parameters(VideoOutput *vo, gint *width, gint *height, gdouble *pixel_aspect);
+
+void video_output_set_brightness(VideoOutput *vo, gint brightness);
+void video_output_set_contrast(VideoOutput *vo, gint contrast);
+void video_output_set_hue(VideoOutput *vo, gint hue);
+void video_output_set_saturation(VideoOutput *vo, gint saturation);

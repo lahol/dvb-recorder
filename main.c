@@ -437,6 +437,11 @@ void main_menu_show_recorder_settings_dialog(void)
     ui_recorder_settings_dialog_show(widgets.main_window, appdata.recorder);
 }
 
+void main_menu_show_video_settings_dialog(void)
+{
+    video_settings_dialog_show(widgets.main_window, appdata.video_output);
+}
+
 void _main_add_accelerator(GtkWidget *item, const gchar *accel_signal, GtkAccelGroup *accel_group,
         guint accel_key, GdkModifierType accel_mods, GtkAccelFlags accel_flags,
         GCallback accel_cb, gpointer accel_data)
@@ -476,6 +481,11 @@ GtkWidget *main_create_context_menu(void)
     item = gtk_menu_item_new_with_label(_("Edit recorder settings"));
     g_signal_connect_swapped(G_OBJECT(item), "activate",
             G_CALLBACK(main_menu_show_recorder_settings_dialog), NULL);
+    gtk_menu_shell_append(GTK_MENU_SHELL(popup), item);
+
+    item = gtk_menu_item_new_with_label(_("Edit video settings"));
+    g_signal_connect_swapped(G_OBJECT(item), "activate",
+            G_CALLBACK(main_menu_show_video_settings_dialog), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(popup), item);
 
     item = gtk_separator_menu_item_new();
@@ -940,6 +950,15 @@ int main(int argc, char **argv)
     gtk_window_present(GTK_WINDOW(widgets.main_window));
 
     appdata.video_output = video_output_new(widgets.drawing_area, main_video_output_event_callback, NULL);
+
+    if (config_get("video", "brightness", CFG_TYPE_INT, &ival) == 0)
+        video_output_set_brightness(appdata.video_output, ival);
+    if (config_get("video", "contrast", CFG_TYPE_INT, &ival) == 0)
+        video_output_set_contrast(appdata.video_output, ival);
+    if (config_get("video", "hue", CFG_TYPE_INT, &ival) == 0)
+        video_output_set_hue(appdata.video_output, ival);
+    if (config_get("video", "saturation", CFG_TYPE_INT, &ival) == 0)
+        video_output_set_saturation(appdata.video_output, ival);
 
     int fd = dvb_recorder_enable_video_source(appdata.recorder, TRUE);
     LOG("recorder video source: %d\n", fd);

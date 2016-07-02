@@ -51,6 +51,11 @@ struct _VideoOutput {
     uint32_t write_error : 1;
     uint32_t is_muted : 1;
     uint32_t videoinfo_valid : 1;
+
+    gint video_brightness;
+    gint video_contrast;
+    gint video_hue;
+    gint video_saturation;
 };
 
 void video_output_setup_pipeline(VideoOutput *vo);
@@ -506,6 +511,13 @@ static void video_output_gst_state_changed_cb(GstBus *bus, GstMessage *msg, Vide
     if (vo->event_cb) {
         switch (new_state) {
             case GST_STATE_READY:
+                g_object_set(G_OBJECT(vo->vsink),
+                             "brightness", vo->video_brightness,
+                             "contrast", vo->video_contrast,
+                             "hue", vo->video_hue,
+                             "saturation", vo->video_saturation,
+                             NULL);
+                             
                 vo->event_cb(vo, VIDEO_OUTPUT_EVENT_READY, vo->event_data);
                 break;
             case GST_STATE_PAUSED:
@@ -567,9 +579,12 @@ void video_output_setup_pipeline(VideoOutput *vo)
     LOG("new pipeline\n");
     vo->pipeline = gst_pipeline_new(NULL);
 
-    LOG("make xvimagesink\n");
+    LOG("make xvimagesink (br: %d, cont: %d, hue: %d, sat: %d\n",
+            vo->video_brightness, vo->video_contrast, vo->video_hue, vo->video_saturation);
     vo->vsink = gst_element_factory_make("xvimagesink", "xvimagesink");
-    g_object_set(G_OBJECT(vo->vsink), "force-aspect-ratio", TRUE, NULL);
+    g_object_set(G_OBJECT(vo->vsink),
+                 "force-aspect-ratio", TRUE,
+                 NULL);
 
     vo->asink = gst_element_factory_make("alsasink", "alsasink");
     LOG("audiosink: %p\n", vo->asink);
@@ -645,6 +660,12 @@ void video_output_setup_pipeline(VideoOutput *vo)
             G_CALLBACK(video_output_gst_message), vo);*/
     g_object_unref(bus);
 
+    g_object_set(G_OBJECT(vo->vsink),
+                 "brightness", vo->video_brightness,
+                 "contrast", vo->video_contrast,
+                 "hue", vo->video_hue,
+                 "saturation", vo->video_saturation,
+                 NULL);
     g_mutex_unlock(&vo->pipeline_mutex);
 }
 
@@ -659,4 +680,64 @@ void video_output_clear_pipeline(VideoOutput *vo)
 
     vo->pipeline = NULL;
     g_mutex_unlock(&vo->pipeline_mutex);
+}
+
+void video_output_set_brightness(VideoOutput *vo, gint brightness)
+{
+    g_return_if_fail(vo != NULL);
+
+    if (brightness < -1000)
+        brightness = -1000;
+    if (brightness > 1000)
+        brightness = 1000;
+
+    vo->video_brightness = brightness;
+
+    if (vo->vsink)
+        g_object_set(G_OBJECT(vo->vsink), "brightness", vo->video_brightness, NULL);
+}
+
+void video_output_set_contrast(VideoOutput *vo, gint contrast)
+{
+    g_return_if_fail(vo != NULL);
+
+    if (contrast < -1000)
+        contrast = -1000;
+    if (contrast > 1000)
+        contrast = 1000;
+
+    vo->video_contrast = contrast;
+
+    if (vo->vsink)
+        g_object_set(G_OBJECT(vo->vsink), "contrast", vo->video_contrast, NULL);
+}
+
+void video_output_set_hue(VideoOutput *vo, gint hue)
+{
+    g_return_if_fail(vo != NULL);
+
+    if (hue < -1000)
+        hue = -1000;
+    if (hue > 1000)
+        hue = 1000;
+
+    vo->video_hue = hue;
+
+    if (vo->vsink)
+        g_object_set(G_OBJECT(vo->vsink), "hue", vo->video_hue, NULL);
+}
+
+void video_output_set_saturation(VideoOutput *vo, gint saturation)
+{
+    g_return_if_fail(vo != NULL);
+
+    if (saturation < -1000)
+        saturation = -1000;
+    if (saturation > 1000)
+        saturation = 1000;
+
+    vo->video_saturation = saturation;
+
+    if (vo->vsink)
+        g_object_set(G_OBJECT(vo->vsink), "saturation", vo->video_saturation, NULL);
 }

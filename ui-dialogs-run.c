@@ -61,4 +61,42 @@ void ui_recorder_settings_dialog_show(GtkWidget *parent, DVBRecorder *recorder)
         gtk_widget_destroy(dialog);
 }
 
+void video_settings_dialog_show(GtkWidget *parent, VideoOutput *vo)
+{
+    GtkWidget *dialog = video_settings_dialog_new(GTK_WINDOW(parent));
+    g_object_set(G_OBJECT(dialog), "video-output", vo, NULL);
 
+    GtkResponseType result = gtk_dialog_run(GTK_DIALOG(dialog));
+
+    gint brightness = 0, contrast = 0, hue = 0, saturation = 0;
+
+    config_get("video", "brightness", CFG_TYPE_INT, &brightness);
+    config_get("video", "contrast", CFG_TYPE_INT, &contrast);
+    config_get("video", "hue", CFG_TYPE_INT, &hue);
+    config_get("video", "saturation", CFG_TYPE_INT, &saturation);
+
+    if (result == GTK_RESPONSE_APPLY) {
+        g_object_get(G_OBJECT(dialog),
+                     "brightness", &brightness,
+                     "contrast", &contrast,
+                     "hue", &hue,
+                     "saturation", &saturation,
+                     NULL);
+        config_set("video", "brightness", CFG_TYPE_INT, GINT_TO_POINTER(brightness));
+        config_set("video", "contrast", CFG_TYPE_INT, GINT_TO_POINTER(contrast));
+        config_set("video", "hue", CFG_TYPE_INT, GINT_TO_POINTER(hue));
+        config_set("video", "saturation", CFG_TYPE_INT, GINT_TO_POINTER(saturation));
+    }
+    else {
+        /* reset values */
+        if (vo) {
+            video_output_set_brightness(vo, brightness);
+            video_output_set_contrast(vo, contrast);
+            video_output_set_hue(vo, hue);
+            video_output_set_saturation(vo, saturation);
+        }
+    }
+
+    if (GTK_IS_DIALOG(dialog))
+        gtk_widget_destroy(dialog);
+}
