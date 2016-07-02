@@ -6,6 +6,8 @@
 #include "favourites-dialog.h"
 #include "config.h"
 
+#include "logging.h"
+
 #include <dvbrecorder/channel-db.h>
 
 struct _UiSidebarChannelsPrivate {
@@ -111,7 +113,7 @@ static void ui_sidebar_channels_class_init(UiSidebarChannelsClass *klass)
 static void _ui_sidebar_channels_channel_row_activated(UiSidebarChannels *sidebar, GtkTreePath *path, GtkTreeViewColumn *column,
         GtkTreeView *tree_view)
 {
-    printf("row activated\n");
+    LOG("row activated\n");
     g_return_if_fail(IS_UI_SIDEBAR_CHANNELS(sidebar));
     GtkTreeIter iter;
     GtkTreeModel *model = gtk_tree_view_get_model(tree_view);
@@ -128,7 +130,7 @@ static void _ui_sidebar_channels_channel_row_activated(UiSidebarChannels *sideba
 
 static void _ui_sidebar_channels_channel_cursor_changed(UiSidebarChannels *sidebar, GtkTreeView *tree_view)
 {
-    fprintf(stderr, "cursor-changed\n");
+    LOG("cursor-changed\n");
     gboolean cfg_channel_change_on_select = FALSE;
     if (config_get("main", "channel-change-on-select", CFG_TYPE_BOOLEAN, &cfg_channel_change_on_select) != 0)
         return;
@@ -154,6 +156,7 @@ static void _ui_sidebar_channels_channel_cursor_changed(UiSidebarChannels *sideb
 
     gtk_tree_path_free(path);
 
+    LOG("cursor-changed: selection: %u\n", selection_id);
     g_signal_emit(sidebar, ui_sidebar_signals[SIGNAL_CHANNEL_SELECTED], 0, selection_id);
 }
 
@@ -165,12 +168,15 @@ GtkListStore *_ui_sidebar_channels_create_favourites_list_store(void)
 
 void _ui_sidebar_channels_reset_channels_list(UiSidebarChannels *sidebar, GtkListStore *store)
 {
+    GtkTreeView *tv = channel_list_get_tree_view(CHANNEL_LIST(sidebar->priv->channel_list));
+    g_signal_handler_block(tv, sidebar->priv->cursor_changed_signal);
     gtk_list_store_clear(store);
 
     guint32 id = ui_sidebar_channels_get_current_list(sidebar);
    
     fprintf(stderr, "reset channels list %u\n", id);
     channel_db_foreach(id, (CHANNEL_DB_FOREACH_CALLBACK)channel_list_fill_cb, store);
+    g_signal_handler_unblock(tv, sidebar->priv->cursor_changed_signal);
 }
 
 void _ui_sidebar_channels_fill_favourites_cb(ChannelDBList *data, GtkListStore *store)

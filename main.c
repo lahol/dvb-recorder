@@ -683,7 +683,7 @@ void main_recorder_channel_selected_cb(UiSidebarChannels *sidebar, guint channel
         }
     }
 
-    dvb_recorder_set_channel(appdata.recorder, channel_id);
+    dvb_recorder_set_channel(appdata.recorder, (guint64)channel_id);
 
     appstatus.recorder.channel_id = channel_id;
     appstatus.recorder.running = 1;
@@ -930,7 +930,7 @@ int main(int argc, char **argv)
         main_action_set_mute(appstatus.recorder.mute);
 
         if (appstatus.recorder.running)
-            dvb_recorder_set_channel(appdata.recorder, appstatus.recorder.channel_id);
+            dvb_recorder_set_channel(appdata.recorder, (guint64)appstatus.recorder.channel_id);
         ui_sidebar_channels_set_current_list(UI_SIDEBAR_CHANNELS(widgets.channel_list), appstatus.recorder.fav_list_id);
         ui_sidebar_channels_set_current_channel(UI_SIDEBAR_CHANNELS(widgets.channel_list), appstatus.recorder.channel_id, FALSE);
     }
