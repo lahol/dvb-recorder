@@ -13,6 +13,7 @@
 #include <gst/interfaces/xoverlay.h>
 #endif
 #include <gst/base/gstbasesink.h>
+#include <gst/base/gstbasesrc.h>
 #include <gst/audio/streamvolume.h>
 #include <gst/video/video.h>
 #include <gdk/gdkx.h>
@@ -633,6 +634,7 @@ void video_output_setup_pipeline(VideoOutput *vo)
     GstElement *source = gst_element_factory_make("fdsrc", "fdsrc");
     LOG("fdsrc: %d\n", vo->infile);
     g_object_set(G_OBJECT(source), "fd", vo->infile, NULL);
+    gst_base_src_set_live(GST_BASE_SRC(source), TRUE);
 
     /* check if textoverlay/textrender suffices and we can get rid of videoconvert */
     vo->cairooverlay = gst_element_factory_make("cairostaticoverlay", "cairooverlay");
