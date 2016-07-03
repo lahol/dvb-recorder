@@ -36,6 +36,12 @@ struct _VideoOutput {
     GstElement *playsink;
     GstElement *cairooverlay;
     GstElement *asink;
+
+    GstElement *audio_input_selector;
+    GQueue audio_channels;
+
+    GList *request_pads;
+
     guint width;
     guint height;
     gdouble pixel_aspect;
@@ -57,6 +63,14 @@ struct _VideoOutput {
     gint video_hue;
     gint video_saturation;
 };
+
+struct VOPadInfo {
+    GstElement *element;
+    GstPad *pad;
+};
+
+void video_output_add_request_pad(VideoOutput *vo, GstElement *element, GstPad *pad);
+void video_output_release_request_pads(VideoOutput *vo);
 
 void video_output_setup_pipeline(VideoOutput *vo);
 void video_output_clear_pipeline(VideoOutput *vo);
@@ -82,6 +96,8 @@ VideoOutput *video_output_new(GtkWidget *drawing_area, VIDEOOUTPUTEVENTCALLBACK 
 
     vo->event_cb = event_cb;
     vo->event_data = event_data;
+
+    g_queue_init(&vo->audio_channels);
 
     return vo;
 }
@@ -397,14 +413,11 @@ static void video_output_pad_added_handler(GstElement *src, GstPad *new_pad, Vid
 
     LOG("VideoOutput, pad new type: %s\n", new_pad_type);
 
-    GstElementClass *cls;
-    GstPadTemplate *templ = NULL;
-
     if (g_str_has_prefix(new_pad_type, "audio")) {
-        cls = GST_ELEMENT_GET_CLASS(vo->playsink);
-        templ = gst_element_class_get_pad_template(cls, "audio_sink");
-        if (templ)
-            sink_pad = gst_element_request_pad(vo->playsink, templ, NULL, NULL);
+        sink_pad = gst_element_get_request_pad(vo->audio_input_selector, "sink_%u");
+        video_output_add_request_pad(vo, vo->audio_input_selector, sink_pad);
+        if (sink_pad)
+            g_queue_push_tail(&vo->audio_channels, sink_pad);
     }
     else if (g_str_has_prefix(new_pad_type, "video")) {
         sink_pad = gst_element_get_static_pad(vo->cairooverlay, "sink");
@@ -428,7 +441,7 @@ static void video_output_pad_added_handler(GstElement *src, GstPad *new_pad, Vid
             LOG("Linkings successful\n");
     }
     else {
-        LOG("could not get sink pad (templ: %p)\n", templ);
+        LOG("could not get sink pad\n");
         gst_element_set_locked_state(GST_ELEMENT(new_pad), TRUE);
         gst_element_set_state(GST_ELEMENT(new_pad), GST_STATE_NULL);
     }
@@ -542,10 +555,11 @@ static void video_output_gst_state_changed_cb(GstBus *bus, GstMessage *msg, Vide
     }
 }
 
-/*static void video_output_gst_message(GstBus *bus, GstMessage *msg, VideoOutput *vo)
+static void video_output_gst_message(GstBus *bus, GstMessage *msg, VideoOutput *vo)
 {
-    LOG("message from %s: %s\n", GST_OBJECT_NAME(msg->src), gst_message_type_get_name(msg->type));
-}*/
+    if (GST_MESSAGE_TYPE(msg) != GST_MESSAGE_TAG)
+        LOG("message from %s: %s\n", GST_OBJECT_NAME(msg->src), gst_message_type_get_name(msg->type));
+}
 
 static void video_output_cairo_info_changed(GstElement *overlay, guint width, guint height, gdouble pixel_aspect, VideoOutput *vo)
 {
@@ -574,7 +588,10 @@ gboolean video_output_get_overlay_surface_parameters(VideoOutput *vo, gint *widt
 
 void video_output_set_overlay_surface(VideoOutput *vo, cairo_surface_t *overlay)
 {
-    g_object_set(G_OBJECT(vo->cairooverlay), "surface", overlay, NULL);
+    if (G_IS_OBJECT(vo->cairooverlay))
+        g_object_set(G_OBJECT(vo->cairooverlay), "surface", overlay, NULL);
+    else if (overlay)
+        cairo_surface_destroy(overlay);
 }
 
 void video_output_setup_pipeline(VideoOutput *vo)
@@ -599,6 +616,9 @@ void video_output_setup_pipeline(VideoOutput *vo)
 
     vo->asink = gst_element_factory_make("alsasink", "alsasink");
     LOG("audiosink: %p\n", vo->asink);
+
+    vo->audio_input_selector = gst_element_factory_make("input-selector", "audioinputselector");
+    LOG("input-selector: %p\n", vo->audio_input_selector);
 
     LOG("make playsink\n");
     vo->playsink = gst_element_factory_make("playsink", "playsink");
@@ -634,13 +654,14 @@ void video_output_setup_pipeline(VideoOutput *vo)
 
     LOG("pipeline: %p, source: %p, decoder: %p\n",
             vo->pipeline, source, decoder);
-    gst_bin_add_many(GST_BIN(vo->pipeline), source, decoder, vo->cairooverlay,
+    gst_bin_add_many(GST_BIN(vo->pipeline), source, decoder, vo->audio_input_selector, vo->cairooverlay,
             vo->playsink, NULL);
     if (!gst_element_link(source, decoder)) {
         LOG("Elements could not be linked. (source -> decoder)\n");
     }
 
     GstPad *playsink_video_pad = gst_element_get_request_pad(vo->playsink, "video_sink");
+    video_output_add_request_pad(vo, vo->playsink, playsink_video_pad);
     GstPad *videoconvert_pad = gst_element_get_static_pad(vo->cairooverlay, "src");
     GstPadLinkReturn ret;
     if (playsink_video_pad && videoconvert_pad) {
@@ -654,6 +675,29 @@ void video_output_setup_pipeline(VideoOutput *vo)
         LOG("Could not request video pad or convert pad: %p, %p\n", playsink_video_pad, videoconvert_pad);
     }
 
+    GstPad *playsink_audio_pad = gst_element_get_request_pad(vo->playsink, "audio_sink");
+    video_output_add_request_pad(vo, vo->playsink, playsink_audio_pad);
+    GstPad *input_selector_pad = gst_element_get_static_pad(vo->audio_input_selector, "src");
+    if (playsink_audio_pad && input_selector_pad) {
+        ret = gst_pad_link(input_selector_pad, playsink_audio_pad);
+        if (GST_PAD_LINK_FAILED(ret))
+            LOG("Linking input-selector -> playsink failed\n");
+        else
+            LOG("Linking successful\n");
+    }
+    else {
+        LOG("Could not request audio pad or input-selector pad: %p, %p\n", playsink_audio_pad, input_selector_pad);
+    }
+
+    if (playsink_audio_pad)
+        gst_object_unref(playsink_audio_pad);
+    if (playsink_video_pad)
+        gst_object_unref(playsink_video_pad);
+    if (videoconvert_pad)
+        gst_object_unref(videoconvert_pad);
+    if (input_selector_pad)
+        gst_object_unref(input_selector_pad);
+
     GstBus *bus = gst_element_get_bus(GST_ELEMENT(vo->pipeline));
 #if GST_CHECK_VERSION(1, 0, 0)
     gst_bus_set_sync_handler(bus, (GstBusSyncHandler)video_output_bus_sync_handler, vo, NULL);
@@ -661,14 +705,15 @@ void video_output_setup_pipeline(VideoOutput *vo)
     gst_bus_set_sync_handler(bus, (GstBusSyncHandler)video_output_bus_sync_handler, vo);
 #endif
     gst_bus_add_signal_watch(bus);
+/*    gst_bus_add_watch(bus, (GstBusFunc)video_output_gst_message, vo);*/
     g_signal_connect(G_OBJECT(bus), "message::error",
             G_CALLBACK(video_output_gst_error_cb), vo);
     g_signal_connect(G_OBJECT(bus), "message::eos",
             G_CALLBACK(video_output_gst_eos_cb), vo);
     g_signal_connect(G_OBJECT(bus), "message::state-changed",
             G_CALLBACK(video_output_gst_state_changed_cb), vo);
-/*    g_signal_connect(G_OBJECT(bus), "message",
-            G_CALLBACK(video_output_gst_message), vo);*/
+    g_signal_connect(G_OBJECT(bus), "message",
+            G_CALLBACK(video_output_gst_message), vo);
     g_object_unref(bus);
 
     g_object_set(G_OBJECT(vo->vsink),
@@ -686,11 +731,45 @@ void video_output_clear_pipeline(VideoOutput *vo)
     g_mutex_lock(&vo->pipeline_mutex);
     if (vo->pipeline) {
         gst_element_set_state(vo->pipeline, GST_STATE_NULL);
+
+        video_output_release_request_pads(vo);
+        g_queue_clear(&vo->audio_channels);
+
         gst_object_unref(vo->pipeline);
     }
 
     vo->pipeline = NULL;
     g_mutex_unlock(&vo->pipeline_mutex);
+}
+
+void video_output_add_request_pad(VideoOutput *vo, GstElement *element, GstPad *pad)
+{
+    if (!vo || !pad)
+        return;
+
+    struct VOPadInfo *entry = g_malloc(sizeof(struct VOPadInfo));
+    entry->element = element;
+    entry->pad = pad;
+    gst_object_ref(GST_OBJECT(pad));
+
+    vo->request_pads = g_list_prepend(vo->request_pads, entry);
+}
+
+void _video_output_request_pad_free(struct VOPadInfo *info)
+{
+    if (info) {
+        gst_element_release_request_pad(info->element, info->pad);
+        gst_object_unref(GST_OBJECT(info->pad));
+        g_free(info);
+    }
+}
+
+void video_output_release_request_pads(VideoOutput *vo)
+{
+    if (vo) {
+        g_list_free_full(vo->request_pads, (GDestroyNotify)_video_output_request_pad_free);
+        vo->request_pads = NULL;
+    }
 }
 
 void video_output_set_brightness(VideoOutput *vo, gint brightness)
@@ -751,4 +830,59 @@ void video_output_set_saturation(VideoOutput *vo, gint saturation)
 
     if (vo->vsink)
         g_object_set(G_OBJECT(vo->vsink), "saturation", vo->video_saturation, NULL);
+}
+
+void video_output_set_audio_channel(VideoOutput *vo, guint channel)
+{
+}
+
+guint video_output_get_audio_channel(VideoOutput *vo, guint *total)
+{
+    if (total)
+        *total = 0;
+
+    g_return_val_if_fail(vo != NULL, 0);
+    g_return_val_if_fail(GST_IS_ELEMENT(vo->audio_input_selector), 0);
+
+    guint n_pads;
+    g_object_get(G_OBJECT(vo->audio_input_selector), "n-pads", &n_pads, NULL);
+
+    if (total)
+        *total = n_pads;
+
+    return 0;
+}
+
+void video_output_audio_channel_next(VideoOutput *vo)
+{
+    g_return_if_fail(vo != NULL);
+    if (!(GST_IS_ELEMENT(vo->audio_input_selector)))
+        return;
+
+    GList *active = NULL;
+    GstPad *old_pad = NULL;
+
+    g_object_get(G_OBJECT(vo->audio_input_selector), "active-pad", &old_pad, NULL);
+
+    active = g_list_find(vo->audio_channels.head, old_pad);
+    if (!active)
+        goto done;
+
+    if (active->next)
+        active = active->next;
+    else
+        active = vo->audio_channels.head;
+
+    if (active->data != old_pad)
+        g_object_set(G_OBJECT(vo->audio_input_selector), "active-pad", active->data, NULL);
+
+    LOG("audio switched from %s:%s to %s:%s\n", GST_DEBUG_PAD_NAME(old_pad), GST_DEBUG_PAD_NAME(active->data));
+
+done:
+    if (old_pad)
+        gst_object_unref(GST_OBJECT(old_pad));
+}
+
+void video_output_audio_channel_prev(VideoOutput *vo)
+{
 }

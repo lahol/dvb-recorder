@@ -315,6 +315,12 @@ void main_action_set_volume(gdouble volume)
     g_signal_handler_unblock(widgets.buttons.volume, widgets.buttons.volume_changed_signal);
 }
 
+void main_action_audio_next(void)
+{
+    LOG("main_action_audio_next\n");
+    video_output_audio_channel_next(appdata.video_output);
+}
+
 static void main_ui_volume_value_changed(GtkScaleButton *button, gdouble value, gpointer data)
 {
     video_output_set_volume(appdata.video_output, value);
@@ -889,6 +895,7 @@ void main_init_actions(void)
     cmd_action_register("snapshot", (CmdCallbackProc)main_action_snapshot, NULL);
     cmd_action_register("toggle_mute", (CmdCallbackProc)main_action_toggle_mute, NULL);
     cmd_action_register("quit", (CmdCallbackProc)main_action_quit, NULL);
+    cmd_action_register("audio_next", (CmdCallbackProc)main_action_audio_next, NULL);
 }
 
 

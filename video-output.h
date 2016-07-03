@@ -31,3 +31,8 @@ void video_output_set_brightness(VideoOutput *vo, gint brightness);
 void video_output_set_contrast(VideoOutput *vo, gint contrast);
 void video_output_set_hue(VideoOutput *vo, gint hue);
 void video_output_set_saturation(VideoOutput *vo, gint saturation);
+
+void video_output_set_audio_channel(VideoOutput *vo, guint channel);
+guint video_output_get_audio_channel(VideoOutput *vo, guint *total);
+void video_output_audio_channel_next(VideoOutput *vo);
+void video_output_audio_channel_prev(VideoOutput *vo);
