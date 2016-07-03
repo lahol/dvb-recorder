@@ -991,6 +991,8 @@ int main(int argc, char **argv)
 
     appdata.osd = osd_new(appdata.recorder, appdata.video_output);
 
+    gboolean bval;
+
     if (!appstatus.recorder.initialized) {
         appstatus.recorder.initialized = 1;
         appstatus.recorder.volume = 1.0;
@@ -1004,8 +1006,14 @@ int main(int argc, char **argv)
         main_action_set_volume(appstatus.recorder.volume);
         main_action_set_mute(appstatus.recorder.mute);
 
-        if (appstatus.recorder.running)
+        if (config_get("dvb", "resume-channel-at-startup", CFG_TYPE_BOOLEAN, &bval) != 0)
+            bval = TRUE;
+
+        if (appstatus.recorder.running && bval)
             dvb_recorder_set_channel(appdata.recorder, (guint64)appstatus.recorder.channel_id);
+        else
+            appstatus.recorder.running = 0;
+
         ui_sidebar_channels_set_current_list(UI_SIDEBAR_CHANNELS(widgets.channel_list), appstatus.recorder.fav_list_id);
         ui_sidebar_channels_set_current_channel(UI_SIDEBAR_CHANNELS(widgets.channel_list), appstatus.recorder.channel_id, FALSE);
     }

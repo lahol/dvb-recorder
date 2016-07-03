@@ -15,7 +15,7 @@
  * subtitles
  ✔ [lib] retrieve current program (from eit 0x4e, maybe take next program if it starts in a few seconds)
  * scheduled recording
- * configure resume channel
+ ✔ configure resume channel
  * configure adapt window size to content
  * teletext
  ✔ osd (subtitles, change of program, status)
@@ -30,7 +30,7 @@
 
  ✔ select last favourites list after restart, as well as last chosen channel
  ✔ select channels with arrow keys, pgup, pgdown (config: tune in immediately or not)
- * show red record symbol and duration
+ ✔ show red record symbol and duration
  * scheduled recording with epg
  ✔ tooltips for buttons/symbols
  ✔ fullscreen -> normal via esc (via configurable command modes)
