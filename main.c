@@ -897,6 +897,22 @@ void main_init_commands(void)
     config_enum_bindings((CfgEnumBindingProc)cmd_add, NULL);
 }
 
+gboolean main_debug_timestamp_to_stderr(gpointer userdata)
+{
+    time_t t;
+    static char buf[64];
+    static struct tm bdt, *pdt = NULL;
+
+    time(&t);
+    localtime_r(&t, &bdt);
+    pdt = &bdt;
+
+    strftime(buf, 63, "[%Y%m%d-%H%M%S]\n", pdt);
+    fputs(buf, stderr);
+
+    return TRUE;
+}
+
 int main(int argc, char **argv)
 {
     if (!XInitThreads()) {
@@ -905,6 +921,11 @@ int main(int argc, char **argv)
     }
 
     gtk_init(&argc, &argv);
+
+    /* <DEBUG> */
+    main_debug_timestamp_to_stderr(NULL);
+    g_timeout_add_seconds(10, main_debug_timestamp_to_stderr, NULL);
+    /* </DEBUG> */
 
     gchar *config = g_build_filename(
             g_get_user_config_dir(),
