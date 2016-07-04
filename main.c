@@ -321,6 +321,14 @@ void main_action_audio_next(void)
     video_output_audio_channel_next(appdata.video_output);
 }
 
+void main_action_switch_channel_main_focus(void)
+{
+    if (!gtk_window_has_toplevel_focus(GTK_WINDOW(widgets.main_window)))
+        gtk_window_present(GTK_WINDOW(widgets.main_window));
+    else
+        gtk_window_present(GTK_WINDOW(widgets.channels_dialog));
+}
+
 static void main_ui_volume_value_changed(GtkScaleButton *button, gdouble value, gpointer data)
 {
     video_output_set_volume(appdata.video_output, value);
@@ -664,6 +672,8 @@ void main_init_channels_dialog(void)
             G_CALLBACK(main_window_status_configure_event), &appstatus.gui.channels_dialog);
     g_signal_connect(G_OBJECT(widgets.channels_dialog), "delete-event",
             G_CALLBACK(main_dialog_delete_event), NULL);
+    g_signal_connect(G_OBJECT(widgets.channels_dialog), "key-press-event",
+            G_CALLBACK(main_key_press_event), NULL);
     gtk_window_set_transient_for(GTK_WINDOW(widgets.channels_dialog), GTK_WINDOW(widgets.main_window));
     GtkWidget *content = gtk_dialog_get_content_area(GTK_DIALOG(widgets.channels_dialog));
 
@@ -694,6 +704,8 @@ void main_init_epg_dialog(void)
             G_CALLBACK(main_window_status_configure_event), &appstatus.gui.epg_dialog);
     g_signal_connect(G_OBJECT(widgets.epg_dialog), "delete-event",
             G_CALLBACK(main_dialog_delete_event), NULL);
+    g_signal_connect(G_OBJECT(widgets.epg_dialog), "key-press-event",
+            G_CALLBACK(main_key_press_event), NULL);
     gtk_window_set_transient_for(GTK_WINDOW(widgets.epg_dialog), GTK_WINDOW(widgets.main_window));
     GtkWidget *content = gtk_dialog_get_content_area(GTK_DIALOG(widgets.epg_dialog));
 
@@ -717,6 +729,8 @@ void main_init_control_dialog(void)
             G_CALLBACK(main_window_status_configure_event), &appstatus.gui.control_dialog);
     g_signal_connect(G_OBJECT(widgets.control_dialog), "delete-event",
             G_CALLBACK(main_dialog_delete_event), NULL);
+    g_signal_connect(G_OBJECT(widgets.control_dialog), "key-press-event",
+            G_CALLBACK(main_key_press_event), NULL);
     gtk_window_set_transient_for(GTK_WINDOW(widgets.control_dialog), GTK_WINDOW(widgets.main_window));
     GtkWidget *content = gtk_dialog_get_content_area(GTK_DIALOG(widgets.control_dialog));
 
@@ -905,6 +919,7 @@ void main_init_actions(void)
     cmd_action_register("toggle_mute", (CmdCallbackProc)main_action_toggle_mute, NULL);
     cmd_action_register("quit", (CmdCallbackProc)main_action_quit, NULL);
     cmd_action_register("audio_next", (CmdCallbackProc)main_action_audio_next, NULL);
+    cmd_action_register("focus_switch_channel_main", (CmdCallbackProc)main_action_switch_channel_main_focus, NULL);
 }
 
 
