@@ -327,11 +327,9 @@ static void main_ui_volume_value_changed(GtkScaleButton *button, gdouble value, 
     appstatus.recorder.volume = value;
 }
 
-static gboolean main_key_event(GtkWidget *widget, GdkEventKey *event, gpointer data)
+static gboolean main_key_press_event(GtkWidget *widget, GdkEventKey *event, gpointer data)
 {
-    LOG("key event\n");
-    if (event->type != GDK_KEY_RELEASE)
-        return FALSE;
+    LOG("key press event\n");
 
     Command *cmd = cmd_find(appdata.command_mode, event->keyval, event->state);
     if (!cmd)
@@ -340,6 +338,13 @@ static gboolean main_key_event(GtkWidget *widget, GdkEventKey *event, gpointer d
     cmd_run(cmd);
 
     return TRUE;
+}
+
+static gboolean main_key_release_event(GtkWidget *widget, GdkEventKey *event, gpointer data)
+{
+    LOG("key release event\n");
+
+    return FALSE;
 }
 
 static gboolean main_button_event(GtkWidget *widget, GdkEventButton *event, gpointer data)
@@ -573,9 +578,9 @@ void main_init_window(void)
     g_signal_connect(G_OBJECT(widgets.main_window), "destroy",
             G_CALLBACK(main_quit), NULL);
     g_signal_connect(G_OBJECT(widgets.main_window), "key-release-event",
-            G_CALLBACK(main_key_event), NULL);
+            G_CALLBACK(main_key_release_event), NULL);
     g_signal_connect(G_OBJECT(widgets.main_window), "key-press-event",
-            G_CALLBACK(main_key_event), NULL);
+            G_CALLBACK(main_key_press_event), NULL);
     g_signal_connect(G_OBJECT(widgets.main_window), "button-press-event",
             G_CALLBACK(main_button_event), NULL);
     g_signal_connect(G_OBJECT(widgets.main_window), "configure-event",
