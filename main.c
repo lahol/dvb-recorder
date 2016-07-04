@@ -703,6 +703,8 @@ void main_init_epg_dialog(void)
     
     gtk_box_pack_start(GTK_BOX(content), widgets.epg_list, TRUE, TRUE, 0);
 
+    gtk_window_add_accel_group(GTK_WINDOW(widgets.epg_dialog), widgets.accelerator_group);
+
     main_position_dialog(widgets.epg_dialog, &appstatus.gui.epg_dialog, 400, 300);
 
     gtk_widget_show_all(widgets.epg_dialog);
@@ -729,6 +731,8 @@ void main_init_control_dialog(void)
     widgets.status_label = gtk_label_new("Ready");
     gtk_label_set_markup(GTK_LABEL(widgets.status_label), "<span size=\"48000\"></span>");
     gtk_box_pack_start(GTK_BOX(content), widgets.status_label, TRUE, TRUE, 0);
+
+    gtk_window_add_accel_group(GTK_WINDOW(widgets.control_dialog), widgets.accelerator_group);
 
     main_position_dialog(widgets.control_dialog, &appstatus.gui.control_dialog, 130, 60);
 
