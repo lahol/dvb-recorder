@@ -560,6 +560,18 @@ static void video_output_gst_message(GstBus *bus, GstMessage *msg, VideoOutput *
 {
     if (GST_MESSAGE_TYPE(msg) != GST_MESSAGE_TAG)
         LOG("message from %s: %s\n", GST_OBJECT_NAME(msg->src), gst_message_type_get_name(msg->type));
+    switch (GST_MESSAGE_TYPE(msg)) {
+        case GST_MESSAGE_WARNING:
+            {
+                gchar *err_msg = NULL;
+                gst_message_parse_warning(msg, NULL, &err_msg);
+                LOG(" message: %s\n", err_msg);
+                g_free(err_msg);
+            }
+            break;
+        default:
+            break;
+    }
 }
 
 static void video_output_cairo_info_changed(GstElement *overlay, guint width, guint height, gdouble pixel_aspect, VideoOutput *vo)
