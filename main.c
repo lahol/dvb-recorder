@@ -861,7 +861,9 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
                     }
                     break;
             }
+            fprintf(stderr, "update button status\n");
             main_ui_update_button_status();
+            fprintf(stderr, "update button status done\n");
             break;
         case DVB_RECORDER_EVENT_STREAM_STATUS_CHANGED:
             LOG("stream status changed: %d\n", ((DVBRecorderEventStreamStatusChanged *)event)->status);
@@ -874,6 +876,8 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
                 case DVB_STREAM_STATUS_TUNE_FAILED:
                     LOG("dvb-recorder: tune failed\n");
                     video_output_set_infile(appdata.video_output, -1);
+                    break;
+                case DVB_STREAM_STATUS_EOS:
                     break;
                 case DVB_STREAM_STATUS_STOPPED:
                     LOG("dvb-recorder: stopped\n");
