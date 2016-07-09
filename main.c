@@ -941,8 +941,11 @@ gboolean main_debug_timestamp_to_stderr(gpointer userdata)
     localtime_r(&t, &bdt);
     pdt = &bdt;
 
-    strftime(buf, 63, "[%Y%m%d-%H%M%S]\n", pdt);
+    float strength = dvb_recorder_get_signal_strength(appdata.recorder);
+
+    strftime(buf, 63, "[%Y%m%d-%H%M%S]", pdt);
     fputs(buf, stderr);
+    fprintf(stderr, " signal strength: %f\n", strength);
 
     return TRUE;
 }
