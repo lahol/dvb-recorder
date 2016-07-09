@@ -832,8 +832,11 @@ void main_video_output_event_callback(VideoOutput *video_output, VideoOutputEven
 {
     switch (event) {
         case VIDEO_OUTPUT_EVENT_PLAYING:
+            fprintf(stderr, "event playing\n");
             appdata.is_video_ready = 1;
             main_notify_channel_change();
+            break;
+        case VIDEO_OUTPUT_EVENT_READY:
             break;
         default:
             break;
@@ -868,6 +871,7 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
             switch (((DVBRecorderEventStreamStatusChanged *)event)->status) {
                 case DVB_STREAM_STATUS_TUNED:
                     LOG("dvb-recorder: tuned in\n");
+                    video_output_set_infile(appdata.video_output, -1);
                     video_output_set_infile(appdata.video_output,
                             dvb_recorder_enable_video_source(appdata.recorder, TRUE));
                     break;
@@ -894,6 +898,7 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
             break;
         case DVB_RECORDER_EVENT_VIDEO_DIED:
             LOG("dvb-recorder: video died\n");
+            video_output_set_infile(appdata.video_output, -1);
             video_output_set_infile(appdata.video_output,
                     dvb_recorder_enable_video_source(appdata.recorder, TRUE));
             break;

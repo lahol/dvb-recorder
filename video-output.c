@@ -527,14 +527,15 @@ static void video_output_gst_state_changed_cb(GstBus *bus, GstMessage *msg, Vide
     GstState old_state, new_state, pending_state;
     gst_message_parse_state_changed(msg, &old_state, &new_state, &pending_state);
     if (GST_MESSAGE_SRC(msg) == GST_OBJECT(vo->pipeline)) {
-        LOG("State set from %s to %s (pending: %s)\n",
+        LOG("%s: State set from %s to %s (pending: %s)\n",
+                GST_OBJECT_NAME(msg->src),
                 gst_element_state_get_name(old_state),
                 gst_element_state_get_name(new_state),
                 gst_element_state_get_name(pending_state));
     }
 
     /* pipeline is ready when we are in paused or playing, obviously */
-    if (vo->event_cb) {
+    if (vo->event_cb && GST_MESSAGE_SRC(msg) == GST_OBJECT(vo->pipeline)) {
         switch (new_state) {
             case GST_STATE_READY:
                 g_object_set(G_OBJECT(vo->vsink),
