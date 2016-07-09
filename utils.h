@@ -8,4 +8,5 @@ gchar *util_translate_control_codes_to_markup(gchar *string);
 
 void util_time_to_string(gchar *buffer, gsize buflen, time_t starttime, gboolean short_format);
 void util_duration_to_string(gchar *buffer, gsize buflen, guint32 seconds);
+void util_duration_to_string_iso(gchar *buffer, gsize buflen, guint32 seconds);
 

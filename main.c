@@ -65,7 +65,8 @@ struct {
     guint record_status_update_source;
     GdkCursor *blank_cursor;
 
-    gchar *rec_status_format;
+    gchar *rec_status_format_normal;
+    gchar *rec_status_format_recording;
 } appdata;
 
 AppStatus appstatus;
@@ -431,39 +432,69 @@ gboolean main_update_record_status(gpointer userdata)
     dvb_recorder_query_record_status(appdata.recorder, &recstatus);
     gchar tbuf[256];
     gchar *markup;
-    util_duration_to_string(tbuf, 256, recstatus.elapsed_time);
+    util_duration_to_string_iso(tbuf, 256, recstatus.elapsed_time);
 
-    if (G_UNLIKELY(appdata.rec_status_format == NULL)) {
-        gchar *font = NULL;
-        gchar *color = NULL;
-        gchar *font_format;
-        gchar *color_format;
-        if (config_get("main", "record-status-font", CFG_TYPE_STRING, &font) != 0) {
-            font_format = g_strdup("size=\"48000\"");
-        }
-        else {
-            font_format = g_strdup_printf("font=\"%s\"", font);
-            g_free(font);
-        }
-        if (config_get("main", "record-status-color", CFG_TYPE_STRING, &color) != 0) {
-            color_format = g_strdup("color=\"red\"");
-        }
-        else {
-            color_format = g_strdup_printf("color=\"%s\"", color);
-            g_free(color);
-        }
+    if (recstatus.status == DVB_RECORD_STATUS_RECORDING) {
+        if (G_UNLIKELY(appdata.rec_status_format_recording == NULL)) {
+            gchar *font = NULL;
+            gchar *color = NULL;
+            gchar *font_format;
+            gchar *color_format;
+            if (config_get("main", "record-status-font", CFG_TYPE_STRING, &font) != 0) {
+                font_format = g_strdup("size=\"48000\"");
+            }
+            else {
+                font_format = g_strdup_printf("font=\"%s\"", font);
+                g_free(font);
+            }
+            if (config_get("main", "record-status-color-recording", CFG_TYPE_STRING, &color) != 0) {
+                color_format = g_strdup("color=\"red\"");
+            }
+            else {
+                color_format = g_strdup_printf("color=\"%s\"", color);
+                g_free(color);
+            }
 
-        appdata.rec_status_format = g_strdup_printf("<span %s %s>%%s: %%s</span>",
-                                                    font_format, color_format);
-        g_free(font_format);
-        g_free(color_format);
+            appdata.rec_status_format_recording = g_strdup_printf("<span %s %s>%%s</span>",
+                                                        font_format, color_format);
+            g_free(font_format);
+            g_free(color_format);
+        }
+        markup = g_markup_printf_escaped(appdata.rec_status_format_recording, tbuf);
+    }
+    else {
+        if (G_UNLIKELY(appdata.rec_status_format_normal == NULL)) {
+            gchar *font = NULL;
+            gchar *color = NULL;
+            gchar *font_format;
+            gchar *color_format;
+            if (config_get("main", "record-status-font", CFG_TYPE_STRING, &font) != 0) {
+                font_format = g_strdup("size=\"48000\"");
+            }
+            else {
+                font_format = g_strdup_printf("font=\"%s\"", font);
+                g_free(font);
+            }
+            if (config_get("main", "record-status-color-normal", CFG_TYPE_STRING, &color) != 0) {
+                color_format = g_strdup("color=\"black\"");
+            }
+            else {
+                color_format = g_strdup_printf("color=\"%s\"", color);
+                g_free(color);
+            }
+
+            appdata.rec_status_format_normal = g_strdup_printf("<span %s %s>%%s</span>",
+                                                        font_format, color_format);
+            g_free(font_format);
+            g_free(color_format);
+        }
+        markup = g_markup_printf_escaped(appdata.rec_status_format_normal, tbuf);
     }
 
-    markup = g_markup_printf_escaped(appdata.rec_status_format,
-            recstatus.status == DVB_RECORD_STATUS_RECORDING ? "R" : "S", tbuf);
-
-    gtk_label_set_markup(GTK_LABEL(widgets.status_label), markup);
-    g_free(markup);
+    if (markup) {
+        gtk_label_set_markup(GTK_LABEL(widgets.status_label), markup);
+        g_free(markup);
+    }
 
     return (gboolean)(recstatus.status == DVB_RECORD_STATUS_RECORDING);
 }
@@ -1115,8 +1146,10 @@ int main(int argc, char **argv)
         g_source_remove(appdata.hide_cursor_source);
     if (appdata.blank_cursor)
         g_object_unref(G_OBJECT(appdata.blank_cursor));
-    if (appdata.rec_status_format)
-        g_free(appdata.rec_status_format);
+    if (appdata.rec_status_format_normal)
+        g_free(appdata.rec_status_format_normal);
+    if (appdata.rec_status_format_recording)
+        g_free(appdata.rec_status_format_recording);
 
 
     LOG("done\n");

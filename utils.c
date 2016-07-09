@@ -181,4 +181,14 @@ void util_duration_to_string(gchar *buffer, gsize buflen, guint32 seconds)
     }
 }
 
+void util_duration_to_string_iso(gchar *buffer, gsize buflen, guint32 seconds)
+{
+    guint32 h, m, s, t;
+    h = seconds / 3600;
+    t = seconds % 3600;
+    m = t / 60;
+    s = t % 60;
+
+    snprintf(buffer, buflen, "%02u:%02u:%02u", h, m, s);
+}
 
