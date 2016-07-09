@@ -112,7 +112,9 @@ void video_output_destroy(VideoOutput *vo)
     g_mutex_lock(&vo->infile_mutex);
     video_output_clear_pipeline(vo);
     g_mutex_unlock(&vo->infile_mutex);
+    LOG("video_output_destroy: free vo\n");
     g_free(vo);
+    LOG("video_output_destroy: done\n");
 }
 
 void video_output_stream_start(VideoOutput *vo)
@@ -456,6 +458,7 @@ done:
 
 static GstBusSyncReply video_output_bus_sync_handler(GstBus *bus, GstMessage *message, VideoOutput *vo)
 {
+    LOG("bus sync handler message: %p\n", message);
     if (GST_MESSAGE_TYPE(message) != GST_MESSAGE_TAG)
         LOG("bus_sync_handler: %s\n", GST_MESSAGE_TYPE_NAME(message));
 #if GST_CHECK_VERSION(1,0,0)
@@ -468,6 +471,7 @@ static GstBusSyncReply video_output_bus_sync_handler(GstBus *bus, GstMessage *me
                 gst_element_state_get_name(newstate),
                 gst_element_state_get_name(pending));
     }
+    LOG("retrun bus pass: %d\n", gst_is_video_overlay_prepare_window_handle_message(message));
     if (!gst_is_video_overlay_prepare_window_handle_message(message))
         return GST_BUS_PASS;
     if (vo->window_id != 0) {
@@ -478,7 +482,9 @@ static GstBusSyncReply video_output_bus_sync_handler(GstBus *bus, GstMessage *me
         LOG("VideoOutput: should have window id now\n");
     }
 
+    LOG("bus_sync_handler message unref\n");
     gst_message_unref(message);
+    LOG("bus_sync_handler message unref done\n");
     return GST_BUS_DROP;
 #else
     if (GST_MESSAGE_TYPE(message) != GST_MESSAGE_ELEMENT)
@@ -565,6 +571,14 @@ static void video_output_gst_message(GstBus *bus, GstMessage *msg, VideoOutput *
             {
                 gchar *err_msg = NULL;
                 gst_message_parse_warning(msg, NULL, &err_msg);
+                LOG(" message: %s\n", err_msg);
+                g_free(err_msg);
+            }
+            break;
+        case GST_MESSAGE_ERROR:
+            {
+                gchar *err_msg = NULL;
+                gst_message_parse_error(msg, NULL, &err_msg);
                 LOG(" message: %s\n", err_msg);
                 g_free(err_msg);
             }
@@ -744,16 +758,21 @@ void video_output_clear_pipeline(VideoOutput *vo)
     LOG("video_output_clear_pipeline: %p\n", vo->pipeline);
     g_mutex_lock(&vo->pipeline_mutex);
     if (vo->pipeline) {
+        LOG("set pipeline to state NULL\n");
         gst_element_set_state(vo->pipeline, GST_STATE_NULL);
 
+        LOG("release request pads\n");
         video_output_release_request_pads(vo);
+        LOG("clear queue\n");
         g_queue_clear(&vo->audio_channels);
+        LOG("unref pipeline\n");
 
         gst_object_unref(vo->pipeline);
     }
 
     vo->pipeline = NULL;
     g_mutex_unlock(&vo->pipeline_mutex);
+    LOG("video_output_clear_pipeline done\n");
 }
 
 void video_output_add_request_pad(VideoOutput *vo, GstElement *element, GstPad *pad)

@@ -880,6 +880,7 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
                     video_output_set_infile(appdata.video_output, -1);
                     break;
                 case DVB_STREAM_STATUS_EOS:
+                    LOG("dvb-recorder: STREAM EOS\n");
                     break;
                 case DVB_STREAM_STATUS_STOPPED:
                     LOG("dvb-recorder: stopped\n");
