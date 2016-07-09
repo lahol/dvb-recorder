@@ -415,7 +415,7 @@ void main_action_quit(gpointer userdata)
             gtk_widget_destroy(dialog);
 
         if (response == GTK_RESPONSE_YES) {
-            dvb_recorder_stop(appdata.recorder);
+            dvb_recorder_record_stop(appdata.recorder);
         }
         else {
             return;
@@ -771,9 +771,10 @@ void main_recorder_channel_selected_cb(UiSidebarChannels *sidebar, guint channel
             gtk_widget_destroy(dialog);
 
         if (response == GTK_RESPONSE_YES) {
-            dvb_recorder_stop(appdata.recorder);
+            dvb_recorder_record_stop(appdata.recorder);
         }
         else {
+            ui_sidebar_channels_set_current_channel(UI_SIDEBAR_CHANNELS(widgets.channel_list), appstatus.recorder.channel_id, FALSE);
             return;
         }
     }
@@ -1052,10 +1053,6 @@ int main(int argc, char **argv)
         video_output_set_hue(appdata.video_output, ival);
     if (config_get("video", "saturation", CFG_TYPE_INT, &ival) == 0)
         video_output_set_saturation(appdata.video_output, ival);
-
-    int fd = dvb_recorder_enable_video_source(appdata.recorder, TRUE);
-    LOG("recorder video source: %d\n", fd);
-    video_output_set_infile(appdata.video_output, fd);
 
     appdata.osd = osd_new(appdata.recorder, appdata.video_output);
 
