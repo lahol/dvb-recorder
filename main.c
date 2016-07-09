@@ -892,6 +892,11 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
                     break;
             }
             break;
+        case DVB_RECORDER_EVENT_VIDEO_DIED:
+            LOG("dvb-recorder: video died\n");
+            video_output_set_infile(appdata.video_output,
+                    dvb_recorder_enable_video_source(appdata.recorder, TRUE));
+            break;
         case DVB_RECORDER_EVENT_EIT_CHANGED:
             {
                 LOG("EIT changed\n");
