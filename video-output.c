@@ -641,9 +641,9 @@ void video_output_setup_pipeline(VideoOutput *vo)
                  NULL);
     LOG("xvimagesink: %p\n", vo->vsink);
 
-    vo->asink = gst_element_factory_make("alsasink", "alsasink");
+/*    vo->asink = gst_element_factory_make("alsasink", "alsasink");
     LOG("audiosink: %p\n", vo->asink);
-
+*/
     vo->audio_input_selector = gst_element_factory_make("input-selector", "audioinputselector");
     LOG("input-selector: %p\n", vo->audio_input_selector);
 
@@ -651,7 +651,7 @@ void video_output_setup_pipeline(VideoOutput *vo)
     vo->playsink = gst_element_factory_make("playsink", "playsink");
     g_object_set(G_OBJECT(vo->playsink),
             "video-sink", vo->vsink,
-            "audio-sink", vo->asink,
+/*            "audio-sink", vo->asink,*/
             "volume", vo->volume,
             "mute", vo->is_muted,
             NULL);
