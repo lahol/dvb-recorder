@@ -427,7 +427,6 @@ void main_action_quit(gpointer userdata)
 
 gboolean main_update_record_status(gpointer userdata)
 {
-    fprintf(stderr, "main_update_record_status\n");
     DVBRecorderRecordStatus recstatus;
     dvb_recorder_query_record_status(appdata.recorder, &recstatus);
     gchar tbuf[256];
@@ -465,7 +464,6 @@ gboolean main_update_record_status(gpointer userdata)
 
     gtk_label_set_markup(GTK_LABEL(widgets.status_label), markup);
     g_free(markup);
-    fprintf(stderr, "main_update_record_status done \n");
 
     return (gboolean)(recstatus.status == DVB_RECORD_STATUS_RECORDING);
 }
@@ -863,9 +861,7 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
                     }
                     break;
             }
-            fprintf(stderr, "update button status\n");
             main_ui_update_button_status();
-            fprintf(stderr, "update button status done\n");
             break;
         case DVB_RECORDER_EVENT_STREAM_STATUS_CHANGED:
             LOG("stream status changed: %d\n", ((DVBRecorderEventStreamStatusChanged *)event)->status);
