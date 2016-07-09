@@ -150,6 +150,20 @@ void video_output_stream_stop(VideoOutput *vo)
     video_output_clear_pipeline(vo);
 }
 
+void video_output_dump_remaining_data(VideoOutput *vo)
+{
+    struct pollfd pfd[1];
+    pfd[0].fd = vo->infile;
+    pfd[0].events = POLLIN;
+
+    unsigned char buf[4096];
+    int rc = 1;
+
+    while (poll(pfd, 1, 0) > 0 && rc > 0) {
+        rc = read(vo->infile, buf, 4096);
+    }
+}
+
 void video_output_set_infile(VideoOutput *vo, int fd)
 {
     LOG("video_output_set_infile: %d\n", fd);
@@ -158,8 +172,9 @@ void video_output_set_infile(VideoOutput *vo, int fd)
     g_mutex_lock(&vo->infile_mutex);
     LOG("vo->infile: %d\n", vo->infile);
     if (vo->infile != -1) {
-        vo->infile = -1;
         video_output_stream_stop(vo);
+        video_output_dump_remaining_data(vo);
+        vo->infile = -1;
     }
 
     vo->infile = fd;
