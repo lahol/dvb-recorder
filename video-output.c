@@ -458,11 +458,10 @@ done:
 
 static GstBusSyncReply video_output_bus_sync_handler(GstBus *bus, GstMessage *message, VideoOutput *vo)
 {
-    LOG("bus sync handler message: %p\n", message);
     if (GST_MESSAGE_TYPE(message) != GST_MESSAGE_TAG)
         LOG("bus_sync_handler: %s\n", GST_MESSAGE_TYPE_NAME(message));
 #if GST_CHECK_VERSION(1,0,0)
-*   if (GST_MESSAGE_TYPE(message) == GST_MESSAGE_STATE_CHANGED) {
+   if (GST_MESSAGE_TYPE(message) == GST_MESSAGE_STATE_CHANGED) {
         GstState oldstate, newstate, pending;
         gst_message_parse_state_changed(message, &oldstate, &newstate, &pending);
         LOG("Element %s changed state from %s to %s (pending: %s)\n",
@@ -471,7 +470,6 @@ static GstBusSyncReply video_output_bus_sync_handler(GstBus *bus, GstMessage *me
                 gst_element_state_get_name(newstate),
                 gst_element_state_get_name(pending));
     }
-    LOG("retrun bus pass: %d\n", gst_is_video_overlay_prepare_window_handle_message(message));
     if (!gst_is_video_overlay_prepare_window_handle_message(message))
         return GST_BUS_PASS;
     if (vo->window_id != 0) {
@@ -482,9 +480,7 @@ static GstBusSyncReply video_output_bus_sync_handler(GstBus *bus, GstMessage *me
         LOG("VideoOutput: should have window id now\n");
     }
 
-    LOG("bus_sync_handler message unref\n");
     gst_message_unref(message);
-    LOG("bus_sync_handler message unref done\n");
     return GST_BUS_DROP;
 #else
     if (GST_MESSAGE_TYPE(message) != GST_MESSAGE_ELEMENT)
@@ -564,8 +560,8 @@ static void video_output_gst_state_changed_cb(GstBus *bus, GstMessage *msg, Vide
 
 static void video_output_gst_message(GstBus *bus, GstMessage *msg, VideoOutput *vo)
 {
-/*    if (GST_MESSAGE_TYPE(msg) != GST_MESSAGE_TAG)
-        LOG("message from %s: %s\n", GST_OBJECT_NAME(msg->src), gst_message_type_get_name(msg->type));*/
+    if (GST_MESSAGE_TYPE(msg) != GST_MESSAGE_TAG)
+        LOG("message from %s: %s\n", GST_OBJECT_NAME(msg->src), gst_message_type_get_name(msg->type));
     switch (GST_MESSAGE_TYPE(msg)) {
         case GST_MESSAGE_WARNING:
             {
