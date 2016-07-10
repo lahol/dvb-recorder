@@ -67,6 +67,9 @@ struct {
 
     gchar *rec_status_format_normal;
     gchar *rec_status_format_recording;
+
+    guint32 osd_channel_id;
+    guint32 osd_snapshot_id;
 } appdata;
 
 AppStatus appstatus;
@@ -852,10 +855,23 @@ void _dump_event(EPGEvent *event)
     LOG("\n");
 }
 
+void main_osd_overlay_removed(guint32 id, gpointer userdata)
+{
+    if (id == appdata.osd_channel_id)
+        appdata.osd_channel_id = 0;
+    else if (id == appdata.osd_snapshot_id)
+        appdata.osd_snapshot_id = 0;
+}
+
 void main_notify_channel_change(void)
 {
     if (!appdata.notified_channel_change && appdata.is_sdt_ready && appdata.is_video_ready) {
-        osd_update_channel_display(appdata.osd, 3);
+        DVBStreamInfo *info = dvb_recorder_get_stream_info(appdata.recorder);
+        osd_begin_transaction(appdata.osd);
+        osd_remove_text(appdata.osd, appdata.osd_channel_id);
+        appdata.osd_channel_id = osd_add_text(appdata.osd, info->service_name, OSD_ALIGN_VERT_TOP | OSD_ALIGN_HORZ_LEFT, 3);
+        osd_commit_transaction(appdata.osd);
+        dvb_stream_info_free(info);
         appdata.notified_channel_change = 1;
     }
 }
@@ -1085,7 +1101,7 @@ int main(int argc, char **argv)
     if (config_get("video", "saturation", CFG_TYPE_INT, &ival) == 0)
         video_output_set_saturation(appdata.video_output, ival);
 
-    appdata.osd = osd_new(appdata.recorder, appdata.video_output);
+    appdata.osd = osd_new(appdata.video_output, (OSDOverlayRemovedCallback)main_osd_overlay_removed, NULL);
 
     gboolean bval;
 
