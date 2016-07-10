@@ -47,4 +47,5 @@
  ✔ set permissions for recordings (a+r)
  ✔ BUG: hotbird -> snapshot -> crash
  ✔ saturation/hue/brightness adjust (xvimagesink)
- * use queue? for signal loss and resyncing
+ ✘ use queue? for signal loss and resyncing
+ * Show channel information (context menu): PIDs, symbolrate, frequency, …
