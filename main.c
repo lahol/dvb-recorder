@@ -268,6 +268,14 @@ void main_action_snapshot(void)
 
     video_output_snapshot(appdata.video_output, filename);
 
+    gchar *basename = g_path_get_basename(filename);
+
+    osd_begin_transaction(appdata.osd);
+    osd_remove_text(appdata.osd, appdata.osd_snapshot_id);
+    appdata.osd_snapshot_id= osd_add_text(appdata.osd, basename, OSD_ALIGN_VERT_BOTTOM | OSD_ALIGN_HORZ_CENTER, 2);
+    osd_commit_transaction(appdata.osd);
+
+    g_free(basename);
     g_free(filename);
     g_free(snapshot_dir);
 }

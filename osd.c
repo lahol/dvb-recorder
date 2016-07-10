@@ -188,11 +188,11 @@ void osd_render_text(OSD *osd, cairo_t *cr, PangoFontDescription *fdesc, const g
         x = osd->width - width - 10.0f;
 
     if (align & OSD_ALIGN_VERT_TOP)
-        x = 10.0f + height;
+        y = 10.0f;
     else if (align & OSD_ALIGN_VERT_CENTER)
-        x = (osd->height - height) * 0.5;
+        y = (osd->height - height) * 0.5;
     else if (align & OSD_ALIGN_VERT_BOTTOM)
-        x = osd->height - height - 10.0f;
+        y = osd->height - height - 10.0f;
 
     cairo_save(cr);
     cairo_translate(cr, x, y);
