@@ -29,6 +29,7 @@ struct _OSD {
 
     guint in_transaction : 1;
     guint force_update : 1;
+    guint hidden : 1;
 
     guint64 last_osd_id;
 };
@@ -99,74 +100,6 @@ gboolean osd_check_timer_elapsed(OSD *osd)
     return (valid_elements > 0);
 }
 
-#if 0
-void osd_update_channel_display(OSD *osd, guint timeout)
-{
-    fprintf(stderr, "osd_update_channel_display, osd: %p\n", osd);
-    g_return_if_fail(osd != NULL);
-
-    DVBStreamInfo *info = dvb_recorder_get_stream_info(osd->recorder);
-    fprintf(stderr, "stream info: %p\n", info);
-    if (!info)
-        return;
-
-    gint width, height;
-    double pixelaspect;
-
-    if (!video_output_get_overlay_surface_parameters(osd->vo, &width, &height, &pixelaspect)) {
-        fprintf(stderr, "could not get overlay surface parameters\n");
-        return;
-    }
-    fprintf(stderr, "surface parameters: %d, %d, %f\n", width, height, pixelaspect);
-
-    gint scaledwidth = width * pixelaspect;
-
-    cairo_surface_t *surf = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, width, height);
-    if (!surf)
-        return;
-
-    cairo_t *cr = cairo_create(surf);
-    if (!cr)
-        goto err;
-
-    cairo_scale(cr, 1.0/pixelaspect, 1.0);
-
-    /* FIXME: use pango, make box around osd */
-
-    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
-    cairo_set_font_size(cr, 32);
-
-    cairo_move_to(cr, 10, 42);
-    cairo_text_path(cr, info->service_name);
-    cairo_set_source_rgba(cr, 1.0, 1.0, 1.0, 1.0);
-    cairo_fill_preserve(cr);
-    cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 1.0);
-    cairo_set_line_width(cr, 1.0);
-    cairo_stroke(cr);
-
-    cairo_destroy(cr);
-
-    dvb_stream_info_free(info);
-
-    video_output_set_overlay_surface(osd->vo, surf);
-
-    osd->timeout = timeout;
-    if (!osd->hide_osd_timer)
-        osd->hide_osd_timer = g_timer_new();
-    g_timer_start(osd->hide_osd_timer);
-    if (!osd->hide_osd_source)
-        osd->hide_osd_source = g_idle_add((GSourceFunc)osd_check_timer_elapsed, osd);
-    
-    return;
-
-err:
-    if (cr)
-        cairo_destroy(cr);
-    if (surf)
-        cairo_surface_destroy(surf);
-    dvb_stream_info_free(info);
-}
-#endif
 void osd_render_text(OSD *osd, cairo_t *cr, PangoFontDescription *fdesc, const gchar *text, OSDTextAlignFlags align)
 {
     int w, h;
@@ -214,6 +147,8 @@ void osd_render_text(OSD *osd, cairo_t *cr, PangoFontDescription *fdesc, const g
 void osd_update_overlay(OSD *osd)
 {
     if (osd->in_transaction)
+        return;
+    if (osd->hidden)
         return;
 
     if (!osd->entries)
@@ -295,6 +230,21 @@ gint osd_compare_id_func(struct OSDEntry *a, guint id)
     if (a->id > id)
         return 1;
     return 0;
+}
+
+void osd_show_osd(OSD *osd, gboolean do_show)
+{
+    g_return_if_fail(osd != NULL);
+
+    if (do_show) {
+        osd->hidden = 0;
+        osd_update_overlay(osd);
+    }
+    else {
+        osd->hidden = 1;
+        video_output_set_overlay_surface(osd->vo, NULL);
+    }
+
 }
 
 guint32 osd_add_text(OSD *osd, const gchar *text, OSDTextAlignFlags align, guint timeout)

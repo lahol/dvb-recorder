@@ -19,6 +19,7 @@ typedef void (*OSDOverlayRemovedCallback)(guint32, gpointer);
 OSD *osd_new(VideoOutput *vo, OSDOverlayRemovedCallback callback, gpointer userdata);
 void osd_cleanup(OSD *osd);
 
+void osd_show_osd(OSD *osd, gboolean do_show);
 guint32 osd_add_text(OSD *osd, const gchar *text, OSDTextAlignFlags align, guint timeout);
 void osd_remove_text(OSD *osd, guint32 id);
 void osd_begin_transaction(OSD *osd);
