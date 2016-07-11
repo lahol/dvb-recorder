@@ -214,6 +214,7 @@ gboolean video_output_snapshot(VideoOutput *vo, const gchar *filename)
             NULL);
 
     sample = gst_video_convert_sample(rawsample, caps, 25 * GST_SECOND, NULL);
+    gst_sample_unref(rawsample);
 
     gst_caps_unref(caps);
     caps = NULL;
