@@ -10,7 +10,7 @@ ifdef GSTREAMER010
 	LIBS   += `$(PKG_CONFIG) --libs gstreamer-0.10 gstreamer-interfaces-0.10 gstreamer-base-0.10`
 else
 	CFLAGS += `$(PKG_CONFIG) --cflags gstreamer-1.0 gstreamer-plugins-base-1.0 gstreamer-base-1.0`
-	LIBS   += `$(PKG_CONFIG) --libs gstreamer-1.0 gstreamer-plugins-base-1.0 gstreamer-base-1.0` -lgstvideo-1.0 -lgstaudio-1.0
+	LIBS   += `$(PKG_CONFIG) --libs gstreamer-1.0 gstreamer-plugins-base-1.0 gstreamer-base-1.0` -lgstvideo-1.0 -lgstaudio-1.0 -lgstapp-1.0
 endif
 
 ifdef RELEASE

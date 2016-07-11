@@ -16,6 +16,7 @@
 #include <gst/base/gstbasesrc.h>
 #include <gst/audio/streamvolume.h>
 #include <gst/video/video.h>
+#include <gst/app/gstappsink.h>
 #include <gdk/gdkx.h>
 
 #include "video-output.h"
@@ -37,6 +38,9 @@ struct _VideoOutput {
     GstElement *playsink;
     GstElement *cairooverlay;
     GstElement *asink;
+
+    GstElement *tee;
+    GstElement *appsink;
 
     GstElement *audio_input_selector;
     GQueue audio_channels;
@@ -197,12 +201,20 @@ gboolean video_output_snapshot(VideoOutput *vo, const gchar *filename)
     GstBuffer *buffer = NULL;
     GstMemory *memory = NULL;
 
+    /*
+    g_signal_emit_by_name(vo->playsink, "convert-sample", caps, &sample);
+    */
+    GstSample *rawsample = gst_app_sink_pull_sample(GST_APP_SINK(vo->appsink));
+    if (rawsample == NULL)
+        goto error;
+
     caps = gst_caps_new_simple("video/x-raw",
             "format", G_TYPE_STRING, "RGB",
             "pixel-aspect-ratio", GST_TYPE_FRACTION, 1, 1,
             NULL);
 
-    g_signal_emit_by_name(vo->playsink, "convert-sample", caps, &sample);
+    sample = gst_video_convert_sample(rawsample, caps, 25 * GST_SECOND, NULL);
+
     gst_caps_unref(caps);
     caps = NULL;
 
@@ -438,7 +450,7 @@ static void video_output_pad_added_handler(GstElement *src, GstPad *new_pad, Vid
             g_queue_push_tail(&vo->audio_channels, sink_pad);
     }
     else if (g_str_has_prefix(new_pad_type, "video")) {
-        sink_pad = gst_element_get_static_pad(vo->cairooverlay, "sink");
+        sink_pad = gst_element_get_static_pad(vo->tee, "sink");
     }
 
     if (sink_pad) {
@@ -668,6 +680,14 @@ void video_output_setup_pipeline(VideoOutput *vo)
             "mute", vo->is_muted,
             NULL);
 
+    vo->tee = gst_element_factory_make("tee", "videotee");
+    LOG("videotee: %p\n", vo->tee);
+    vo->appsink = gst_element_factory_make("appsink", "appsink");
+    LOG("appsink: %p\n", vo->appsink);
+    gst_app_sink_set_max_buffers(GST_APP_SINK(vo->appsink), 1);
+    gst_app_sink_set_drop(GST_APP_SINK(vo->appsink), TRUE);
+
+
     LOG("video_output_setup_pipeline, make fdsrc\n");
     GstElement *source = gst_element_factory_make("fdsrc", "fdsrc");
     LOG("fdsrc: %d\n", vo->infile);
@@ -694,7 +714,7 @@ void video_output_setup_pipeline(VideoOutput *vo)
 
     LOG("pipeline: %p, source: %p, decoder: %p\n",
             vo->pipeline, source, decoder);
-    gst_bin_add_many(GST_BIN(vo->pipeline), source, decoder, vo->audio_input_selector, vo->cairooverlay,
+    gst_bin_add_many(GST_BIN(vo->pipeline), source, decoder, vo->audio_input_selector, vo->tee, vo->appsink, vo->cairooverlay,
             vo->playsink, NULL);
     if (!gst_element_link(source, decoder)) {
         LOG("Elements could not be linked. (source -> decoder)\n");
@@ -714,6 +734,38 @@ void video_output_setup_pipeline(VideoOutput *vo)
     else {
         LOG("Could not request video pad or convert pad: %p, %p\n", playsink_video_pad, videoconvert_pad);
     }
+
+    GstPad *main_video_pad = gst_element_get_static_pad(vo->cairooverlay, "sink");
+    GstPad *video_tee_pad = gst_element_get_request_pad(vo->tee, "src_%u");
+    video_output_add_request_pad(vo, vo->tee, video_tee_pad);
+    if (main_video_pad && video_tee_pad) {
+        ret = gst_pad_link(video_tee_pad, main_video_pad);
+        if (GST_PAD_LINK_FAILED(ret))
+            LOG("Linking tee -> cairooverlay failed\n");
+        else
+            LOG("Linking successful\n");
+    }
+    else {
+        LOG("Could not request tee or overlay pad: %p, %p\n", video_tee_pad, main_video_pad);
+    }
+    if (video_tee_pad)
+        gst_object_unref(video_tee_pad);
+
+    GstPad *app_video_pad = gst_element_get_static_pad(vo->appsink, "sink");
+    video_tee_pad = gst_element_get_request_pad(vo->tee, "src_%u");
+    video_output_add_request_pad(vo, vo->tee, video_tee_pad);
+    if (app_video_pad && video_tee_pad) {
+        ret = gst_pad_link(video_tee_pad, app_video_pad);
+        if (GST_PAD_LINK_FAILED(ret))
+            LOG("Linking tee -> appsink\n");
+        else
+            LOG("Linking successful\n");
+    }
+    else {
+        LOG("Could not request tee or appsink pad: %p, %p\n", video_tee_pad, app_video_pad);
+    }
+    if (video_tee_pad)
+        gst_object_unref(video_tee_pad);
 
     GstPad *playsink_audio_pad = gst_element_get_request_pad(vo->playsink, "audio_sink");
     video_output_add_request_pad(vo, vo->playsink, playsink_audio_pad);
