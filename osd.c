@@ -3,6 +3,8 @@
 #include <pango/pangocairo.h>
 #include <stdio.h>
 #include "config.h"
+#include <gdk/gdk.h>
+#include <math.h>
 
 struct OSDEntry {
     guint32 id;
@@ -100,7 +102,8 @@ gboolean osd_check_timer_elapsed(OSD *osd)
     return (valid_elements > 0);
 }
 
-void osd_render_text(OSD *osd, cairo_t *cr, PangoFontDescription *fdesc, const gchar *text, OSDTextAlignFlags align)
+void osd_render_text(OSD *osd, cairo_t *cr, PangoFontDescription *fdesc, GdkRGBA *color, gboolean dark,
+                     const gchar *text, OSDTextAlignFlags align)
 {
     int w, h;
     gdouble width, height;
@@ -133,10 +136,14 @@ void osd_render_text(OSD *osd, cairo_t *cr, PangoFontDescription *fdesc, const g
     pango_cairo_update_layout(cr, layout);
 
     pango_cairo_layout_path(cr, layout);
-    cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 1.0);
+    if (dark)
+        cairo_set_source_rgba(cr, 1.0, 1.0, 1.0, 1.0);
+    else
+        cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 1.0);
     cairo_set_line_width(cr, 2.0);
     cairo_stroke(cr);
-    cairo_set_source_rgba(cr, 1.0, 1.0, 1.0, 1.0);
+
+    gdk_cairo_set_source_rgba(cr, color);
     pango_cairo_show_layout(cr, layout);
 
     cairo_restore(cr);
@@ -191,9 +198,22 @@ void osd_update_overlay(OSD *osd)
             goto err;
     }
 
+    GdkRGBA font_color = { 1.0, 1.0, 1.0, 1.0 };
+    gchar *osd_color = NULL;
+    if (config_get("main", "osd-color", CFG_TYPE_STRING, &osd_color) == 0) {
+        gdk_rgba_parse(&font_color, osd_color);
+        g_free(osd_color);
+    }
+
+    gboolean dark = FALSE;
+/*    if (sqrt(  0.299*font_color.red*font_color.red 
+             + 0.587*font_color.green*font_color.green
+             + 0.114*font_color.blue*font_color.blue) < 0.5)*/
+    if (0.299 * font_color.red + 0.587 * font_color.green + 0.114 * font_color.blue < 0.5)
+        dark = TRUE;
     for (tmp = osd->entries; tmp; tmp = g_list_next(tmp)) {
         entry = (struct OSDEntry *)tmp->data;
-        osd_render_text(osd, cr, fdesc, entry->text, entry->align);
+        osd_render_text(osd, cr, fdesc, &font_color, dark, entry->text, entry->align);
     }
 
     pango_font_description_free(fdesc);
