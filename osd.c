@@ -158,8 +158,10 @@ void osd_update_overlay(OSD *osd)
     if (osd->hidden)
         return;
 
-    if (!osd->entries)
+    if (!osd->entries) {
         video_output_set_overlay_surface(osd->vo, NULL);
+        return;
+    }
 
     gint width, height;
     double pixelaspect;
