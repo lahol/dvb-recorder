@@ -350,6 +350,16 @@ static void main_ui_volume_value_changed(GtkScaleButton *button, gdouble value, 
 static gboolean main_key_press_event(GtkWidget *widget, GdkEventKey *event, gpointer data)
 {
     LOG("key press event\n");
+    fprintf(stderr, "key press for event: type: %s\n",
+            G_OBJECT_TYPE_NAME(gtk_window_get_focus(GTK_WINDOW(widget))));
+
+    guint focus_type = G_OBJECT_TYPE(gtk_window_get_focus(GTK_WINDOW(widget)));
+
+    /* ignore simple key presses if we are in a GtkEntry */
+    if (focus_type == GTK_TYPE_ENTRY) {
+        if ((event->state & ~(GDK_SHIFT_MASK | GDK_RELEASE_MASK)) == 0)
+            return FALSE;
+    }
 
     Command *cmd = cmd_find(appdata.command_mode, event->keyval, event->state);
     if (!cmd)
