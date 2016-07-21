@@ -45,6 +45,7 @@ GtkTreeSelection *channel_list_get_selection(ChannelList *channel_list);
 GtkListStore *channel_list_get_list_store(ChannelList *channel_list);
 GtkTreeView *channel_list_get_tree_view(ChannelList *channel_list);
 
-void channel_list_fill_cb(ChannelData *data, GtkListStore *store);
+void channel_list_fill_cb(ChannelData *data, ChannelList *channel_list);
+void channel_list_clear(ChannelList *channel_list);
 
 G_END_DECLS

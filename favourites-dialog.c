@@ -609,8 +609,8 @@ void channel_favourites_dialog_reset_favourites_channel_store(ChannelFavouritesD
 
 void channel_favourites_dialog_update_channel_list(ChannelFavouritesDialog *self)
 {
-    gtk_list_store_clear(self->priv->channels_all);
-    channel_db_foreach(0, (CHANNEL_DB_FOREACH_CALLBACK)channel_list_fill_cb, self->priv->channels_all);
+    channel_list_clear(CHANNEL_LIST(self->priv->channel_all_list));
+    channel_db_foreach(0, (CHANNEL_DB_FOREACH_CALLBACK)channel_list_fill_cb, self->priv->channel_all_list);
 }
 
 void channel_favourites_dialog_set_active_list(ChannelFavouritesDialog *self, guint32 list_id)

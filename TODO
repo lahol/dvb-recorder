@@ -21,7 +21,7 @@
  * teletext
  ✔ osd (subtitles, change of program, status)
  ✔ configure keyboard shortcuts
- * handle multiple audio
+ ✔ handle multiple audio
  ✔ select audio channel
  * [lib+scan] support satellites Astra 19.2 E (S19E2), Hotbird 13.0 E (S13E0), Eurobird 9.0 E (S9E0 – 9.0 east Eurobird 9); make this configurable (get list via w_scan -c?)
  ✔ show satellite in channel list
@@ -43,7 +43,7 @@
  * in edit channel list: tune to channel possible (not modal) also in current edited list
  * mark channels already in fav-list
  * volume to low?
- * snapshot: show filename
+ ✔ snapshot: show filename
  ✔ set permissions for recordings (a+r)
  ✔ BUG: hotbird -> snapshot -> crash
  ✔ saturation/hue/brightness adjust (xvimagesink)

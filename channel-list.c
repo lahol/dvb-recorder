@@ -18,6 +18,8 @@ struct _ChannelListPrivate {
 
     gchar *filter_text;
     gchar *filter_source;
+
+    GList *active_sources;
 };
 
 G_DEFINE_TYPE(ChannelList, channel_list, GTK_TYPE_BIN);
@@ -140,19 +142,27 @@ void _channel_list_filter_changed(GtkWidget *widget, gpointer data)
 /* data = GtkWidget (entry filter) */
 static gboolean _channel_list_visible_func(GtkTreeModel *model, GtkTreeIter *iter, ChannelList *self)
 {
-    if (self->priv->filter_text == NULL || self->priv->filter_text[0] == '\0') {
+    fprintf(stderr, "filter_text: %s, filter_source: %s\n", self->priv->filter_text, self->priv->filter_source);
+    if ((self->priv->filter_text == NULL || self->priv->filter_text[0] == '\0')
+            && (self->priv->filter_source == NULL || self->priv->filter_source[0] == '\0')) {
         return TRUE;
     }
 
     gchar *channel;
-    gtk_tree_model_get(model, iter, CHNL_ROW_TITLE, &channel, -1);
+    gchar *source;
+    gtk_tree_model_get(model, iter, CHNL_ROW_TITLE, &channel, CHNL_ROW_SOURCE, &source, -1);
     gchar *lcchannel = g_utf8_strdown(channel, -1);
+    g_free(channel);
 
     gboolean result = FALSE;
-    if (g_strstr_len(lcchannel, -1, self->priv->filter_text) != NULL)
+    if (self->priv->filter_text && self->priv->filter_text[0] != '\0' && 
+            g_strstr_len(lcchannel, -1, self->priv->filter_text) != NULL)
+        result = TRUE;
+    if (self->priv->filter_source && g_strcmp0(source, self->priv->filter_source) == 0)
         result = TRUE;
 
     g_free(lcchannel);
+    g_free(source);
 
     return result;
 }
@@ -291,15 +301,33 @@ GtkTreeView *channel_list_get_tree_view(ChannelList *channel_list)
     return GTK_TREE_VIEW(channel_list->priv->channel_tree_view);
 }
 
-void channel_list_fill_cb(ChannelData *data, GtkListStore *store)
+void channel_list_fill_cb(ChannelData *data, ChannelList *channel_list)
 {
+    g_return_if_fail(IS_CHANNEL_LIST(channel_list));
+    g_return_if_fail(data != NULL);
+
     GtkTreeIter iter;
 
-    gtk_list_store_append(store, &iter);
-    gtk_list_store_set(store, &iter,
+    gtk_list_store_append(channel_list->priv->channels_store, &iter);
+    gtk_list_store_set(channel_list->priv->channels_store, &iter,
            CHNL_ROW_ID, data->id,
            CHNL_ROW_TITLE, data->name,
            CHNL_ROW_SOURCE, data->signalsource,
            CHNL_ROW_FOREGROUND, data->flags & CHNL_FLAG_DIRTY ? "gray" : NULL,
            -1);
+
+/*    GQuark source_quark = g_quark_from_string(data->signalsource);
+    if (!g_list_find(*/
 }
+
+void channel_list_clear(ChannelList *channel_list)
+{
+    g_return_if_fail(IS_CHANNEL_LIST(channel_list));
+
+    if (channel_list->priv->channels_store)
+        gtk_list_store_clear(channel_list->priv->channels_store);
+
+    g_list_free(channel_list->priv->active_sources);
+    channel_list->priv->active_sources = NULL;
+}
+

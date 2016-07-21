@@ -170,12 +170,13 @@ void _ui_sidebar_channels_reset_channels_list(UiSidebarChannels *sidebar, GtkLis
 {
     GtkTreeView *tv = channel_list_get_tree_view(CHANNEL_LIST(sidebar->priv->channel_list));
     g_signal_handler_block(tv, sidebar->priv->cursor_changed_signal);
-    gtk_list_store_clear(store);
+
+    channel_list_clear(CHANNEL_LIST(sidebar->priv->channel_list));
 
     guint32 id = ui_sidebar_channels_get_current_list(sidebar);
    
     fprintf(stderr, "reset channels list %u\n", id);
-    channel_db_foreach(id, (CHANNEL_DB_FOREACH_CALLBACK)channel_list_fill_cb, store);
+    channel_db_foreach(id, (CHANNEL_DB_FOREACH_CALLBACK)channel_list_fill_cb, sidebar->priv->channel_list);
     g_signal_handler_unblock(tv, sidebar->priv->cursor_changed_signal);
 }
 
