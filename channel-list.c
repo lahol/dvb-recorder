@@ -15,6 +15,9 @@ struct _ChannelListPrivate {
     GtkTreeSelection *selection;
 
     gboolean filterable;
+
+    gchar *filter_text;
+    gchar *filter_source;
 };
 
 G_DEFINE_TYPE(ChannelList, channel_list, GTK_TYPE_BIN);
@@ -34,6 +37,9 @@ static void channel_list_dispose(GObject *gobject)
     ChannelList *self = CHANNEL_LIST(gobject);
 
     g_clear_object(&self->priv->model);
+
+    g_free(self->priv->filter_text);
+    self->priv->filter_text = NULL;
 
     G_OBJECT_CLASS(channel_list_parent_class)->dispose(gobject);
 }
@@ -124,16 +130,17 @@ static void channel_list_class_init(ChannelListClass *klass)
 void _channel_list_filter_changed(GtkWidget *widget, gpointer data)
 {
     ChannelListPrivate *priv = (ChannelListPrivate *)data;
+    if (priv->filter_text)
+        g_free(priv->filter_text);
+    priv->filter_text = g_utf8_strdown(gtk_entry_get_text(GTK_ENTRY(widget)), -1);
     if (priv->channels_filter_model)
         gtk_tree_model_filter_refilter(GTK_TREE_MODEL_FILTER(priv->channels_filter_model));
 }
 
 /* data = GtkWidget (entry filter) */
-gboolean _channel_list_visible_func(GtkTreeModel *model, GtkTreeIter *iter, gpointer data)
+static gboolean _channel_list_visible_func(GtkTreeModel *model, GtkTreeIter *iter, ChannelList *self)
 {
-    gchar *filter = g_utf8_strdown(gtk_entry_get_text(GTK_ENTRY(data)), -1);
-    if (filter == NULL || filter[0] == '\0') {
-        g_free(filter);
+    if (self->priv->filter_text == NULL || self->priv->filter_text[0] == '\0') {
         return TRUE;
     }
 
@@ -142,10 +149,9 @@ gboolean _channel_list_visible_func(GtkTreeModel *model, GtkTreeIter *iter, gpoi
     gchar *lcchannel = g_utf8_strdown(channel, -1);
 
     gboolean result = FALSE;
-    if (g_strstr_len(lcchannel, -1, filter) != NULL)
+    if (g_strstr_len(lcchannel, -1, self->priv->filter_text) != NULL)
         result = TRUE;
 
-    g_free(filter);
     g_free(lcchannel);
 
     return result;
@@ -232,7 +238,7 @@ void channel_list_set_model(ChannelList *channel_list, GtkTreeModel *model)
         if (channel_list->priv->filterable) {
             channel_list->priv->channels_filter_model = gtk_tree_model_filter_new(model, NULL);
             gtk_tree_model_filter_set_visible_func(GTK_TREE_MODEL_FILTER(channel_list->priv->channels_filter_model),
-                    (GtkTreeModelFilterVisibleFunc)_channel_list_visible_func, channel_list->priv->filter_entry, NULL);
+                    (GtkTreeModelFilterVisibleFunc)_channel_list_visible_func, channel_list, NULL);
 
             gtk_tree_view_set_model(GTK_TREE_VIEW(channel_list->priv->channel_tree_view),
                     channel_list->priv->channels_filter_model);
