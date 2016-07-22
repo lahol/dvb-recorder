@@ -47,5 +47,7 @@ GtkTreeView *channel_list_get_tree_view(ChannelList *channel_list);
 
 void channel_list_fill_cb(ChannelData *data, ChannelList *channel_list);
 void channel_list_clear(ChannelList *channel_list);
+void channel_list_set_active_signal_source(ChannelList *channel_list, const gchar *signal_source);
+const gchar *channel_list_get_active_signal_source(ChannelList *channel_list);
 
 G_END_DECLS

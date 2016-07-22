@@ -77,6 +77,7 @@ AppStatus appstatus;
 GtkWidget *main_create_context_menu(void);
 void main_recorder_channel_selected_cb(UiSidebarChannels *sidebar, guint channel_id, gpointer userdata);
 void main_recorder_favourites_list_changed_cb(UiSidebarChannels *sidebar, guint fav_list_id, gpointer userdata);
+void main_recorder_sidebar_signal_source_changed_cb(UiSidebarChannels *sidebar, gchar *signal_source, gpointer userdata);
 gboolean main_dialog_delete_event(GtkWidget *widget, GdkEvent *event, gpointer userdata);
 gboolean main_update_record_status(gpointer userdata);
 
@@ -739,6 +740,8 @@ void main_init_channels_dialog(void)
             G_CALLBACK(main_recorder_channel_selected_cb), NULL);
     g_signal_connect(G_OBJECT(widgets.channel_list), "favourites-list-changed",
             G_CALLBACK(main_recorder_favourites_list_changed_cb), NULL);
+    g_signal_connect(G_OBJECT(widgets.channel_list), "signal-source-changed",
+            G_CALLBACK(main_recorder_sidebar_signal_source_changed_cb), NULL);
 
 
     gtk_box_pack_start(GTK_BOX(content), widgets.channel_list, TRUE, TRUE, 0);
@@ -845,6 +848,13 @@ void main_recorder_channel_selected_cb(UiSidebarChannels *sidebar, guint channel
 void main_recorder_favourites_list_changed_cb(UiSidebarChannels *sidebar, guint fav_list_id, gpointer userdata)
 {
     appstatus.recorder.fav_list_id = fav_list_id;
+}
+
+void main_recorder_sidebar_signal_source_changed_cb(UiSidebarChannels *sidebar, gchar *signal_source, gpointer userdata)
+{
+    fprintf(stderr, "signal source changed to %s\n", signal_source);
+    g_free(appstatus.recorder.signal_source);
+    appstatus.recorder.signal_source = g_strdup(signal_source);
 }
 
 void main_ui_update_button_status(void)
@@ -1146,6 +1156,7 @@ int main(int argc, char **argv)
             appstatus.recorder.running = 0;
 
         ui_sidebar_channels_set_current_list(UI_SIDEBAR_CHANNELS(widgets.channel_list), appstatus.recorder.fav_list_id);
+        ui_sidebar_channels_set_current_signal_source(UI_SIDEBAR_CHANNELS(widgets.channel_list), appstatus.recorder.signal_source);
         ui_sidebar_channels_set_current_channel(UI_SIDEBAR_CHANNELS(widgets.channel_list), appstatus.recorder.channel_id, FALSE);
     }
 

@@ -37,5 +37,7 @@ guint32 ui_sidebar_channels_get_current_list(UiSidebarChannels *sidebar);
 void ui_sidebar_channels_set_current_list(UiSidebarChannels *sidebar, guint32 id);
 guint32 ui_sidebar_channels_get_current_channel(UiSidebarChannels *sidebar);
 void ui_sidebar_channels_set_current_channel(UiSidebarChannels *sidebar, guint32 id, gboolean activate);
+const gchar *ui_sidebar_channels_get_current_signal_source(UiSidebarChannels *sidebar);
+void ui_sidebar_channels_set_current_signal_source(UiSidebarChannels *sidebar, const gchar *signal_source);
 
 G_END_DECLS

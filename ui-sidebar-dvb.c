@@ -33,6 +33,7 @@ enum {
 enum {
     SIGNAL_CHANNEL_SELECTED = 0,
     SIGNAL_FAVOURITES_LIST_CHANGED,
+    SIGNAL_SIGNAL_SOURCE_CHANGED,
     N_SIGNALS
 };
 
@@ -106,6 +107,18 @@ static void ui_sidebar_channels_class_init(UiSidebarChannelsClass *klass)
                 1,
                 G_TYPE_UINT,
                 NULL);
+    ui_sidebar_signals[SIGNAL_SIGNAL_SOURCE_CHANGED] =
+        g_signal_new("signal-source-changed",
+                G_TYPE_FROM_CLASS(gobject_class),
+                G_SIGNAL_RUN_LAST,
+                0,
+                NULL,
+                NULL,
+                NULL,
+                G_TYPE_NONE,
+                1,
+                G_TYPE_STRING,
+                NULL);
 
     g_type_class_add_private(G_OBJECT_CLASS(klass), sizeof(UiSidebarChannelsPrivate));
 }
@@ -158,6 +171,11 @@ static void _ui_sidebar_channels_channel_cursor_changed(UiSidebarChannels *sideb
 
     LOG("cursor-changed: selection: %u\n", selection_id);
     g_signal_emit(sidebar, ui_sidebar_signals[SIGNAL_CHANNEL_SELECTED], 0, selection_id);
+}
+
+static void _ui_sidebar_channels_signal_source_changed(UiSidebarChannels *sidebar, gchar *signal_source, ChannelList *channel_list)
+{
+    g_signal_emit(sidebar, ui_sidebar_signals[SIGNAL_SIGNAL_SOURCE_CHANGED], 0, signal_source);
 }
 
 GtkListStore *_ui_sidebar_channels_create_favourites_list_store(void)
@@ -235,6 +253,8 @@ static void populate_widget(UiSidebarChannels *self)
             G_CALLBACK(_ui_sidebar_channels_channel_row_activated), self);
     self->priv->cursor_changed_signal = g_signal_connect_swapped(G_OBJECT(tv), "cursor-changed",
             G_CALLBACK(_ui_sidebar_channels_channel_cursor_changed), self);
+    g_signal_connect_swapped(G_OBJECT(self->priv->channel_list), "signal-source-changed",
+            G_CALLBACK(_ui_sidebar_channels_signal_source_changed), self);
 
     gtk_box_pack_start(GTK_BOX(vbox), self->priv->channel_list, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(vbox), self->priv->favourites_list_widget, FALSE, FALSE, 0);
@@ -402,3 +422,16 @@ void ui_sidebar_channels_set_current_channel(UiSidebarChannels *sidebar, guint32
     }
 }
 
+const gchar *ui_sidebar_channels_get_current_signal_source(UiSidebarChannels *sidebar)
+{
+    g_return_val_if_fail(IS_UI_SIDEBAR_CHANNELS(sidebar), NULL);
+
+    return channel_list_get_active_signal_source(CHANNEL_LIST(sidebar->priv->channel_list));
+}
+
+void ui_sidebar_channels_set_current_signal_source(UiSidebarChannels *sidebar, const gchar *signal_source)
+{
+    g_return_if_fail(IS_UI_SIDEBAR_CHANNELS(sidebar));
+
+    channel_list_set_active_signal_source(CHANNEL_LIST(sidebar->priv->channel_list), signal_source);
+}

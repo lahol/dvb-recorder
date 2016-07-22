@@ -9,6 +9,9 @@ struct _ChannelListPrivate {
     GtkWidget *channel_tree_view;
     GtkWidget *filter_entry;
 
+    GtkWidget *signal_source_widget;
+    GtkListStore *signal_source_store;
+
     GtkListStore *channels_store;
     GtkTreeModel *channels_filter_model;
 
@@ -20,6 +23,14 @@ struct _ChannelListPrivate {
     gchar *filter_source;
 
     GList *active_sources;
+    GQuark current_source;
+    guint combo_box_changed_signal;
+};
+
+enum {
+    SIGNAL_SOURCE_ID,
+    SIGNAL_SOURCE_TITLE,
+    SIGNAL_SOURCE_N
 };
 
 G_DEFINE_TYPE(ChannelList, channel_list, GTK_TYPE_BIN);
@@ -31,6 +42,13 @@ enum {
     PROP_FILTERABLE,
     N_PROPERTIES
 };
+
+enum {
+    SIGNAL_SIGNAL_SOURCE_CHANGED = 0,
+    N_SIGNALS
+};
+
+guint channel_list_signals[N_SIGNALS];
 
 void channel_list_set_filterable(ChannelList *channel_list, gboolean filterable);
 
@@ -125,12 +143,26 @@ static void channel_list_class_init(ChannelListClass *klass)
                 TRUE,
                 G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
+    channel_list_signals[SIGNAL_SIGNAL_SOURCE_CHANGED] =
+        g_signal_new("signal-source-changed",
+                G_TYPE_FROM_CLASS(gobject_class),
+                G_SIGNAL_RUN_LAST,
+                0,
+                NULL,
+                NULL,
+                NULL,
+                G_TYPE_NONE,
+                1,
+                G_TYPE_STRING,
+                NULL);
+
     g_type_class_add_private(G_OBJECT_CLASS(klass), sizeof(ChannelListPrivate));
 }
 
 /* data = ChannelListPrivate */
-void _channel_list_filter_changed(GtkWidget *widget, gpointer data)
+static void _channel_list_filter_changed(GtkWidget *widget, gpointer data)
 {
+    fprintf(stderr, "filter_changed\n");
     ChannelListPrivate *priv = (ChannelListPrivate *)data;
     if (priv->filter_text)
         g_free(priv->filter_text);
@@ -139,30 +171,50 @@ void _channel_list_filter_changed(GtkWidget *widget, gpointer data)
         gtk_tree_model_filter_refilter(GTK_TREE_MODEL_FILTER(priv->channels_filter_model));
 }
 
+static void _channel_list_signal_source_changed(ChannelList *self, GtkComboBox *box)
+{
+    fprintf(stderr, "signal source changed\n");
+    g_return_if_fail(IS_CHANNEL_LIST(self));
+
+    GQuark new_source;
+    GtkTreeIter iter;
+    if (gtk_combo_box_get_active_iter(box, &iter)) {
+        gtk_tree_model_get(GTK_TREE_MODEL(self->priv->signal_source_store), &iter, SIGNAL_SOURCE_ID, &new_source, -1);
+        self->priv->current_source = new_source;
+        gtk_tree_model_filter_refilter(GTK_TREE_MODEL_FILTER(self->priv->channels_filter_model));
+
+        g_signal_emit(self, channel_list_signals[SIGNAL_SIGNAL_SOURCE_CHANGED], 0, g_quark_to_string(new_source));
+    }
+}
+
 /* data = GtkWidget (entry filter) */
 static gboolean _channel_list_visible_func(GtkTreeModel *model, GtkTreeIter *iter, ChannelList *self)
 {
-    fprintf(stderr, "filter_text: %s, filter_source: %s\n", self->priv->filter_text, self->priv->filter_source);
     if ((self->priv->filter_text == NULL || self->priv->filter_text[0] == '\0')
-            && (self->priv->filter_source == NULL || self->priv->filter_source[0] == '\0')) {
+            && self->priv->current_source == 0) {
         return TRUE;
     }
 
     gchar *channel;
     gchar *source;
     gtk_tree_model_get(model, iter, CHNL_ROW_TITLE, &channel, CHNL_ROW_SOURCE, &source, -1);
+    if (!channel)
+        return FALSE;
     gchar *lcchannel = g_utf8_strdown(channel, -1);
     g_free(channel);
 
+    GQuark source_quark = g_quark_from_string(source);
+    g_free(source);
+
     gboolean result = FALSE;
-    if (self->priv->filter_text && self->priv->filter_text[0] != '\0' && 
-            g_strstr_len(lcchannel, -1, self->priv->filter_text) != NULL)
-        result = TRUE;
-    if (self->priv->filter_source && g_strcmp0(source, self->priv->filter_source) == 0)
-        result = TRUE;
+    if (self->priv->current_source == source_quark || self->priv->current_source == 0) {
+        if ((self->priv->filter_text && self->priv->filter_text[0] != '\0' && 
+                g_strstr_len(lcchannel, -1, self->priv->filter_text) != NULL) ||
+                self->priv->filter_text == NULL || self->priv->filter_text[0] == '\0')
+            result = TRUE;
+    }
 
     g_free(lcchannel);
-    g_free(source);
 
     return result;
 }
@@ -184,6 +236,19 @@ static void populate_widget(ChannelList *self)
     GtkCellRenderer *renderer;
     GtkTreeViewColumn *column;
 
+    self->priv->signal_source_widget = gtk_combo_box_new_with_model(
+            GTK_TREE_MODEL(self->priv->signal_source_store));
+    self->priv->combo_box_changed_signal =
+        g_signal_connect_swapped(G_OBJECT(self->priv->signal_source_widget), "changed",
+                G_CALLBACK(_channel_list_signal_source_changed), self);
+    g_object_unref(self->priv->signal_source_store);
+
+    renderer = gtk_cell_renderer_text_new();
+
+    gtk_cell_layout_pack_start(GTK_CELL_LAYOUT(self->priv->signal_source_widget), renderer, TRUE);
+    gtk_cell_layout_set_attributes(GTK_CELL_LAYOUT(self->priv->signal_source_widget), renderer, "text",
+            SIGNAL_SOURCE_TITLE, NULL);
+
     renderer = gtk_cell_renderer_text_new();
     column = gtk_tree_view_column_new_with_attributes(_("Source"),
             renderer, "text", CHNL_ROW_SOURCE, "foreground", CHNL_ROW_FOREGROUND, NULL);
@@ -204,6 +269,7 @@ static void populate_widget(ChannelList *self)
 
     GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
     gtk_box_pack_start(GTK_BOX(box), self->priv->filter_entry, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(box), self->priv->signal_source_widget, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(box), self->priv->channels_widget, TRUE, TRUE, 0);
 
     gtk_widget_show_all(box);
@@ -218,6 +284,8 @@ static void channel_list_init(ChannelList *self)
             CHANNEL_LIST_TYPE, ChannelListPrivate);
 
     gtk_widget_set_has_window(GTK_WIDGET(self), FALSE);
+
+    self->priv->signal_source_store = gtk_list_store_new(SIGNAL_SOURCE_N, G_TYPE_UINT, G_TYPE_STRING);
 
     populate_widget(self);
 
@@ -316,8 +384,21 @@ void channel_list_fill_cb(ChannelData *data, ChannelList *channel_list)
            CHNL_ROW_FOREGROUND, data->flags & CHNL_FLAG_DIRTY ? "gray" : NULL,
            -1);
 
-/*    GQuark source_quark = g_quark_from_string(data->signalsource);
-    if (!g_list_find(*/
+    GQuark source_quark = g_quark_from_string(data->signalsource);
+    if (source_quark && !g_list_find(channel_list->priv->active_sources, (gpointer)source_quark)) {
+        channel_list->priv->active_sources = g_list_prepend(channel_list->priv->active_sources, (gpointer)source_quark);
+        /* append to combobox */
+        g_signal_handler_block(channel_list->priv->signal_source_widget, channel_list->priv->combo_box_changed_signal);
+        gtk_list_store_append(channel_list->priv->signal_source_store, &iter);
+        gtk_list_store_set(channel_list->priv->signal_source_store, &iter,
+                SIGNAL_SOURCE_ID, source_quark,
+                SIGNAL_SOURCE_TITLE, data->signalsource,
+                -1);
+        if (source_quark == channel_list->priv->current_source) {
+            gtk_combo_box_set_active_iter(GTK_COMBO_BOX(channel_list->priv->signal_source_widget), &iter);
+        }
+        g_signal_handler_unblock(channel_list->priv->signal_source_widget, channel_list->priv->combo_box_changed_signal);
+    }
 }
 
 void channel_list_clear(ChannelList *channel_list)
@@ -329,5 +410,47 @@ void channel_list_clear(ChannelList *channel_list)
 
     g_list_free(channel_list->priv->active_sources);
     channel_list->priv->active_sources = NULL;
+
+    if (channel_list->priv->signal_source_store) {
+        g_signal_handler_block(channel_list->priv->signal_source_widget, channel_list->priv->combo_box_changed_signal);
+        gtk_list_store_clear(channel_list->priv->signal_source_store);
+        GtkTreeIter iter;
+
+        gtk_list_store_append(channel_list->priv->signal_source_store, &iter);
+        gtk_list_store_set(channel_list->priv->signal_source_store, &iter,
+                SIGNAL_SOURCE_ID, 0,
+                SIGNAL_SOURCE_TITLE, "All satellites",
+                -1);
+        g_signal_handler_unblock(channel_list->priv->signal_source_widget, channel_list->priv->combo_box_changed_signal);
+    }
 }
 
+void channel_list_set_active_signal_source(ChannelList *channel_list, const gchar *signal_source)
+{
+    g_return_if_fail(IS_CHANNEL_LIST(channel_list));
+
+    gboolean valid;
+    GQuark id;
+    GtkTreeIter iter;
+    GQuark source_quark = g_quark_from_string(signal_source);
+
+    for (valid = gtk_tree_model_get_iter_first(GTK_TREE_MODEL(channel_list->priv->signal_source_store), &iter);
+         valid;
+         valid = gtk_tree_model_iter_next(GTK_TREE_MODEL(channel_list->priv->signal_source_store), &iter)) {
+        gtk_tree_model_get(GTK_TREE_MODEL(channel_list->priv->signal_source_store), &iter,
+                                          SIGNAL_SOURCE_ID, &id, -1);
+        if (source_quark == id) {
+            gtk_combo_box_set_active_iter(GTK_COMBO_BOX(channel_list->priv->signal_source_widget), &iter);
+        }
+    }
+}
+
+const gchar *channel_list_get_active_signal_source(ChannelList *channel_list)
+{
+    g_return_val_if_fail(IS_CHANNEL_LIST(channel_list), NULL);
+
+    if (channel_list->priv->current_source)
+        return g_quark_to_string(channel_list->priv->current_source);
+
+    return NULL;
+}
