@@ -141,6 +141,14 @@ static void _ui_sidebar_channels_channel_row_activated(UiSidebarChannels *sideba
     g_signal_emit(sidebar, ui_sidebar_signals[SIGNAL_CHANNEL_SELECTED], 0, selection_id);
 }
 
+static gboolean _ui_sidebar_channels_channel_button_press(UiSidebarChannels *sidebar, GdkEventButton *event,
+        GtkTreeView *tree_view)
+{
+    if (event->button == 3)
+        return TRUE;
+    return FALSE;
+}
+
 static void _ui_sidebar_channels_channel_cursor_changed(UiSidebarChannels *sidebar, GtkTreeView *tree_view)
 {
     LOG("cursor-changed\n");
@@ -249,8 +257,11 @@ static void populate_widget(UiSidebarChannels *self)
 
     self->priv->channel_list = channel_list_new(TRUE);
     GtkTreeView *tv = channel_list_get_tree_view(CHANNEL_LIST(self->priv->channel_list));
+    gtk_tree_view_set_activate_on_single_click(tv, TRUE);
     g_signal_connect_swapped(G_OBJECT(tv), "row-activated",
             G_CALLBACK(_ui_sidebar_channels_channel_row_activated), self);
+    g_signal_connect_swapped(G_OBJECT(tv), "button-press-event",
+            G_CALLBACK(_ui_sidebar_channels_channel_button_press), self);
     self->priv->cursor_changed_signal = g_signal_connect_swapped(G_OBJECT(tv), "cursor-changed",
             G_CALLBACK(_ui_sidebar_channels_channel_cursor_changed), self);
     g_signal_connect_swapped(G_OBJECT(self->priv->channel_list), "signal-source-changed",

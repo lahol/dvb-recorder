@@ -39,7 +39,7 @@
  * index entries in channel and fav-list consequtively)
  * fixed numbers for channels configurable (to sync with other devices)
  ✔ edit channel list: select current fav-list
- * channel list split for satellites (notebook) and select current chosen satellite
+ ✔ channel list split for satellites (notebook) and select current chosen satellite
  * in edit channel list: tune to channel possible (not modal) also in current edited list
  * mark channels already in fav-list
  * volume to low?
