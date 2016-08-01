@@ -38,6 +38,7 @@ void status_save(AppStatus *status, gchar *filename)
     status_save_window_data(kf, "Window:channels", &status->gui.channels_dialog);
     status_save_window_data(kf, "Window:epg", &status->gui.epg_dialog);
     status_save_window_data(kf, "Window:control", &status->gui.control_dialog);
+    status_save_window_data(kf, "Window:channel-properties", &status->gui.channel_properties_dialog);
 
     status_save_recorder_data(kf, &status->recorder);
 
@@ -99,6 +100,7 @@ void status_restore(AppStatus *status, gchar *filename)
     status_restore_window_data(kf, "Window:channels", &status->gui.channels_dialog);
     status_restore_window_data(kf, "Window:epg", &status->gui.epg_dialog);
     status_restore_window_data(kf, "Window:control", &status->gui.control_dialog);
+    status_restore_window_data(kf, "Window:channel-properties", &status->gui.channel_properties_dialog);
 
     status_restore_recorder_data(kf, &status->recorder);
 

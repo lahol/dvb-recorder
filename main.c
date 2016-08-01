@@ -33,6 +33,7 @@ struct {
     GtkWidget *epg_dialog;
     GtkWidget *epg_list;
     GtkWidget *control_dialog;
+    GtkWidget *channel_properties_dialog;
 
     struct {
         GtkWidget *record;
@@ -79,6 +80,7 @@ void main_recorder_channel_selected_cb(UiSidebarChannels *sidebar, guint channel
 void main_recorder_favourites_list_changed_cb(UiSidebarChannels *sidebar, guint fav_list_id, gpointer userdata);
 void main_recorder_sidebar_signal_source_changed_cb(UiSidebarChannels *sidebar, gchar *signal_source, gpointer userdata);
 gboolean main_dialog_delete_event(GtkWidget *widget, GdkEvent *event, gpointer userdata);
+void main_dialog_response_event(GtkWidget *widget, gint response_id, GuiWindowStatus *winstatus);
 gboolean main_update_record_status(gpointer userdata);
 
 void main_window_status_set_visible(GtkWidget *window, GuiWindowStatus *status, gboolean is_visible)
@@ -166,6 +168,7 @@ void main_window_status_set_fullscreen(gboolean fullscreen)
         main_window_status_set_visible(widgets.channels_dialog, &appstatus.gui.channels_dialog, FALSE);
         main_window_status_set_visible(widgets.epg_dialog, &appstatus.gui.epg_dialog, FALSE);
         main_window_status_set_visible(widgets.control_dialog, &appstatus.gui.control_dialog, FALSE);
+        main_window_status_set_visible(widgets.channel_properties_dialog, &appstatus.gui.channel_properties_dialog, FALSE);
         gtk_window_fullscreen(GTK_WINDOW(widgets.main_window));
         appstatus.gui.main_window.fullscreen = 1;
 
@@ -179,6 +182,7 @@ void main_window_status_set_fullscreen(gboolean fullscreen)
         main_window_status_set_visible(widgets.channels_dialog, &appstatus.gui.channels_dialog, TRUE);
         main_window_status_set_visible(widgets.epg_dialog, &appstatus.gui.epg_dialog, TRUE);
         main_window_status_set_visible(widgets.control_dialog, &appstatus.gui.control_dialog, TRUE);
+        main_window_status_set_visible(widgets.channel_properties_dialog, &appstatus.gui.channel_properties_dialog, TRUE);
         gtk_window_unfullscreen(GTK_WINDOW(widgets.main_window));
         appstatus.gui.main_window.fullscreen = 0;
 
@@ -408,6 +412,14 @@ gboolean main_dialog_delete_event(GtkWidget *widget, GdkEvent *event, gpointer u
     return TRUE;
 }
 
+void main_dialog_response_event(GtkWidget *widget, gint response_id, GuiWindowStatus *winstatus)
+{
+    if (response_id == GTK_RESPONSE_CLOSE || response_id == GTK_RESPONSE_DELETE_EVENT ||
+            response_id == GTK_RESPONSE_NONE) {
+        main_window_status_set_show(widget, winstatus, FALSE);
+    }
+}
+
 void main_menu_show_channels_dialog(gpointer userdata)
 {
     main_window_status_toggle_show(widgets.channels_dialog, &appstatus.gui.channels_dialog);
@@ -421,6 +433,11 @@ void main_menu_show_epg_dialog(gpointer userdata)
 void main_menu_show_control_dialog(gpointer userdata)
 {
     main_window_status_toggle_show(widgets.control_dialog, &appstatus.gui.control_dialog);
+}
+
+void main_menu_show_channel_properties_dialog(gpointer userdata)
+{
+    main_window_status_toggle_show(widgets.channel_properties_dialog, &appstatus.gui.channel_properties_dialog);
 }
 
 void main_action_quit(gpointer userdata)
@@ -569,6 +586,11 @@ GtkWidget *main_create_context_menu(void)
     item = gtk_menu_item_new_with_label(_("Show EPG"));
     g_signal_connect_swapped(G_OBJECT(item), "activate",
             G_CALLBACK(main_menu_show_epg_dialog), NULL);
+    gtk_menu_shell_append(GTK_MENU_SHELL(popup), item);
+
+    item = gtk_menu_item_new_with_label(_("Show channel properties"));
+    g_signal_connect_swapped(G_OBJECT(item), "activate",
+            G_CALLBACK(main_menu_show_channel_properties_dialog), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(popup), item);
 
     item = gtk_menu_item_new_with_label(_("Edit channel lists"));
@@ -807,6 +829,25 @@ void main_init_control_dialog(void)
     main_position_dialog(widgets.control_dialog, &appstatus.gui.control_dialog, 130, 60);
 
     gtk_widget_show_all(widgets.control_dialog);
+}
+
+void main_init_channel_properties_dialog(void)
+{
+    widgets.channel_properties_dialog = ui_channel_properties_dialog_new(GTK_WINDOW(widgets.main_window));
+    g_signal_connect(G_OBJECT(widgets.channel_properties_dialog), "configure-event",
+            G_CALLBACK(main_window_status_configure_event), &appstatus.gui.channel_properties_dialog);
+    g_signal_connect(G_OBJECT(widgets.channel_properties_dialog), "delete-event",
+            G_CALLBACK(main_dialog_delete_event), NULL);
+    g_signal_connect(G_OBJECT(widgets.channel_properties_dialog), "response",
+            G_CALLBACK(main_dialog_response_event), &appstatus.gui.channel_properties_dialog);
+    g_signal_connect(G_OBJECT(widgets.channel_properties_dialog), "key-press-event",
+            G_CALLBACK(main_key_press_event), NULL);
+
+    gtk_window_set_title(GTK_WINDOW(widgets.channel_properties_dialog), _("Channel Properties"));
+
+    main_position_dialog(widgets.channel_properties_dialog, &appstatus.gui.channel_properties_dialog, 300, 200);
+
+    gtk_widget_show_all(widgets.channel_properties_dialog);
 }
 
 void main_recorder_channel_selected_cb(UiSidebarChannels *sidebar, guint channel_id, gpointer userdata)
@@ -1102,6 +1143,7 @@ int main(int argc, char **argv)
     main_init_channels_dialog();
     main_init_epg_dialog();
     ui_epg_list_set_recorder_handle(UI_EPG_LIST(widgets.epg_list), appdata.recorder);
+    main_init_channel_properties_dialog();
 
     if (appstatus.gui.main_window.initialized &&
             appstatus.gui.main_window.fullscreen)
@@ -1116,6 +1158,9 @@ int main(int argc, char **argv)
     if (appstatus.gui.epg_dialog.initialized)
         main_window_status_set_show(widgets.epg_dialog, &appstatus.gui.epg_dialog,
                                     appstatus.gui.epg_dialog.show_window);
+    if (appstatus.gui.channel_properties_dialog.initialized)
+        main_window_status_set_show(widgets.channel_properties_dialog, &appstatus.gui.channel_properties_dialog,
+                                    appstatus.gui.channel_properties_dialog.show_window);
 
     gtk_window_present(GTK_WINDOW(widgets.main_window));
 

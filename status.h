@@ -18,6 +18,7 @@ typedef struct {
     GuiWindowStatus epg_dialog;
     GuiWindowStatus channels_dialog;
     GuiWindowStatus control_dialog;
+    GuiWindowStatus channel_properties_dialog;
 } GuiStatus;
 
 typedef struct {

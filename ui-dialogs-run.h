@@ -9,6 +9,7 @@
 #include "favourites-dialog.h"
 #include "ui-recorder-settings-dialog.h"
 #include "video-settings-dialog.h"
+#include "ui-channel-properties-dialog.h"
 
 GtkResponseType ui_dialog_scan_show(GtkWidget *parent, DVBRecorder *recorder);
 void favourites_dialog_show(GtkWidget *parent, DVBRecorder *recorder, guint32 list_id,
