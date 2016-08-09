@@ -34,6 +34,7 @@ enum {
     SIGNAL_CHANNEL_SELECTED = 0,
     SIGNAL_FAVOURITES_LIST_CHANGED,
     SIGNAL_SIGNAL_SOURCE_CHANGED,
+    SIGNAL_CHANNEL_CONTEXT_ACTION,
     N_SIGNALS
 };
 
@@ -119,6 +120,19 @@ static void ui_sidebar_channels_class_init(UiSidebarChannelsClass *klass)
                 1,
                 G_TYPE_STRING,
                 NULL);
+    ui_sidebar_signals[SIGNAL_CHANNEL_CONTEXT_ACTION] =
+        g_signal_new("channel-context-action",
+                G_TYPE_FROM_CLASS(gobject_class),
+                G_SIGNAL_RUN_LAST | G_SIGNAL_DETAILED,
+                0,
+                NULL,
+                NULL,
+                NULL,
+                G_TYPE_NONE,
+                2,
+                G_TYPE_UINT,
+                G_TYPE_UINT,
+                NULL);
 
     g_type_class_add_private(G_OBJECT_CLASS(klass), sizeof(UiSidebarChannelsPrivate));
 }
@@ -141,11 +155,66 @@ static void _ui_sidebar_channels_channel_row_activated(UiSidebarChannels *sideba
     g_signal_emit(sidebar, ui_sidebar_signals[SIGNAL_CHANNEL_SELECTED], 0, selection_id);
 }
 
+struct _UiSidebarContextData {
+    UiSidebarChannels *sidebar;
+    guint32 channel_id;
+};
+
+static void _ui_sidebar_channels_context_details_activate(struct _UiSidebarContextData *data)
+{
+    if (data) {
+        g_signal_emit(data->sidebar, ui_sidebar_signals[SIGNAL_CHANNEL_CONTEXT_ACTION],
+                g_quark_from_string("show-details"), g_quark_from_string("show-details"),
+                data->channel_id);
+        g_free(data);
+    }
+}
+
+static void _ui_sidebar_channels_context_popup_menu(UiSidebarChannels *sidebar, GdkEventButton *event,
+                                                    guint32 channel_id)
+{
+    GtkWidget *menu;
+    GtkWidget *item;
+
+    struct _UiSidebarContextData *context_data = g_malloc0(sizeof(struct _UiSidebarContextData));
+    context_data->sidebar = sidebar;
+    context_data->channel_id = channel_id;
+
+    menu = gtk_menu_new();
+    item = gtk_menu_item_new_with_label(_("Details"));
+    g_signal_connect_swapped(G_OBJECT(item), "activate",
+            G_CALLBACK(_ui_sidebar_channels_context_details_activate), context_data);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+
+    gtk_widget_show_all(menu);
+    gtk_menu_popup(GTK_MENU(menu), NULL, NULL, NULL, NULL, event->button, event->time);
+}
+
 static gboolean _ui_sidebar_channels_channel_button_press(UiSidebarChannels *sidebar, GdkEventButton *event,
         GtkTreeView *tree_view)
 {
-    if (event->button == 3)
+    if (event->button == 3) {
+        GtkTreePath *path = NULL;
+        GtkTreeView *tv = channel_list_get_tree_view(CHANNEL_LIST(sidebar->priv->channel_list));
+        if (tv && gtk_tree_view_get_path_at_pos(GTK_TREE_VIEW(tv),
+                    (gint)event->x, (gint)event->y,
+                    &path, NULL, NULL, NULL)) {
+            GtkTreeIter iter;
+            GtkTreeModel *model = gtk_tree_view_get_model(tv);
+            if (model == NULL || !gtk_tree_model_get_iter(model, &iter, path)) {
+                gtk_tree_path_free(path);
+                return TRUE;
+            }
+            guint32 channel_id;
+
+            gtk_tree_model_get(model, &iter, CHNL_ROW_ID, &channel_id, -1);
+            gtk_tree_path_free(path);
+
+            _ui_sidebar_channels_context_popup_menu(sidebar, event, channel_id);
+        }
         return TRUE;
+    }
+
     return FALSE;
 }
 

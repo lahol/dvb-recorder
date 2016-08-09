@@ -79,6 +79,7 @@ GtkWidget *main_create_context_menu(void);
 void main_recorder_channel_selected_cb(UiSidebarChannels *sidebar, guint channel_id, gpointer userdata);
 void main_recorder_favourites_list_changed_cb(UiSidebarChannels *sidebar, guint fav_list_id, gpointer userdata);
 void main_recorder_sidebar_signal_source_changed_cb(UiSidebarChannels *sidebar, gchar *signal_source, gpointer userdata);
+void main_recorder_sidebar_show_channel_details_cb(UiSidebarChannels *sidebar, GQuark action, guint32 channel_id, gpointer userdata);
 gboolean main_dialog_delete_event(GtkWidget *widget, GdkEvent *event, gpointer userdata);
 void main_dialog_response_event(GtkWidget *widget, gint response_id, GuiWindowStatus *winstatus);
 gboolean main_update_record_status(gpointer userdata);
@@ -764,6 +765,8 @@ void main_init_channels_dialog(void)
             G_CALLBACK(main_recorder_favourites_list_changed_cb), NULL);
     g_signal_connect(G_OBJECT(widgets.channel_list), "signal-source-changed",
             G_CALLBACK(main_recorder_sidebar_signal_source_changed_cb), NULL);
+    g_signal_connect(G_OBJECT(widgets.channel_list), "channel-context-action::show-details",
+            G_CALLBACK(main_recorder_sidebar_show_channel_details_cb), NULL);
 
 
     gtk_box_pack_start(GTK_BOX(content), widgets.channel_list, TRUE, TRUE, 0);
@@ -896,6 +899,11 @@ void main_recorder_sidebar_signal_source_changed_cb(UiSidebarChannels *sidebar, 
     fprintf(stderr, "signal source changed to %s\n", signal_source);
     g_free(appstatus.recorder.signal_source);
     appstatus.recorder.signal_source = g_strdup(signal_source);
+}
+
+void main_recorder_sidebar_show_channel_details_cb(UiSidebarChannels *sidebar, GQuark action, guint32 channel_id, gpointer userdata)
+{
+    ui_channel_properties_dialog_set_channel_id(UI_CHANNEL_PROPERTIES_DIALOG(widgets.channel_properties_dialog), channel_id);
 }
 
 void main_ui_update_button_status(void)
