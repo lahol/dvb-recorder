@@ -179,7 +179,49 @@ void ui_channel_properties_dialog_set_channel_id(UiChannelPropertiesDialog *dial
 
     dialog->priv->channel_data = channel_db_get_channel(channel_id);
 
-    /* FIXME: Update listbox */
+    gtk_list_store_clear(dialog->priv->properties);
+
+    if (!dialog->priv->channel_data)
+        return;
+
+    GtkTreeIter iter;
+    gchar numbuf[64];
+    gchar *buf;
+    ChannelData *data = dialog->priv->channel_data;
+
+#define SET_VALUE(key, value) do {\
+    gtk_list_store_append(dialog->priv->properties, &iter);\
+    gtk_list_store_set(dialog->priv->properties, &iter,\
+            CHNL_PROP_KEY, (key),\
+            CHNL_PROP_VALUE, (value),\
+            -1);\
+    } while (0)
+#define SET_VALUE_UINT(key, value) do {\
+    g_snprintf(numbuf, 64, "%u", (value));\
+    SET_VALUE((key), numbuf);\
+    } while (0)
+#define SET_VALUE_FORMAT(key, format, value) do {\
+    buf = g_strdup_printf((format), (value));\
+    SET_VALUE((key), buf);\
+    } while (0)
+
+    SET_VALUE_UINT("Id", data->id);
+    SET_VALUE("Name", data->name);
+    SET_VALUE("Provider", data->provider);
+    SET_VALUE("Signal source", data->signalsource);
+    SET_VALUE_FORMAT("Frequency", "%f GHz", data->frequency * 0.001f);
+    SET_VALUE("Polarization", data->polarization == CHNL_POLARIZATION_HORIZONTAL ? "horizontal" : "vertical");
+    SET_VALUE_UINT("Symbolrate", data->srate);
+    SET_VALUE("Video-PID", data->vpid);
+    SET_VALUE("Audio-PID", data->apid);
+    SET_VALUE_UINT("Teletext-PID", data->tpid);
+    SET_VALUE_UINT("Service ID", data->sid);
+    SET_VALUE_UINT("Network ID", data->nid);
+    SET_VALUE_UINT("Transports stream ID", data->tid);
+
+#undef SET_VALUE_FORMAT
+#undef SET_VALUE_UINT
+#undef SET_VALUE
 }
 
 guint32 ui_channel_properties_dialog_get_channel_id(UiChannelPropertiesDialog *dialog)
