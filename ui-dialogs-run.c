@@ -1,6 +1,7 @@
 #include "ui-dialogs-run.h"
 #include "config.h"
 #include <dvbrecorder/dvb-scanner.h>
+#include <dvbrecorder/scheduled.h>
 
 GtkResponseType ui_dialog_scan_show(GtkWidget *parent, DVBRecorder *recorder)
 {
@@ -100,3 +101,21 @@ void video_settings_dialog_show(GtkWidget *parent, VideoOutput *vo)
     if (GTK_IS_DIALOG(dialog))
         gtk_widget_destroy(dialog);
 }
+
+void ui_add_scheduled_event_dialog_show(GtkWidget *parent)
+{
+    GtkWidget *dialog = ui_add_scheduled_event_dialog_new(GTK_WINDOW(parent));
+
+    GtkResponseType result = gtk_dialog_run(GTK_DIALOG(dialog));
+
+    if (result == GTK_RESPONSE_ACCEPT) {
+        /* get event */
+        ScheduledEvent *event = NULL;
+        g_object_get(G_OBJECT(dialog), "scheduled-event", &event, NULL);
+        fprintf(stderr, "add new scheduled event\n");
+    }
+
+    if (GTK_IS_DIALOG(dialog))
+        gtk_widget_destroy(dialog);
+}
+
