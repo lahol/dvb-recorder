@@ -117,9 +117,14 @@ static void ui_scheduled_events_dialog_class_init(UiScheduledEventsDialogClass *
     g_type_class_add_private(G_OBJECT_CLASS(klass), sizeof(UiScheduledEventsDialogPrivate));
 }
 
-static void _ui_scheduled_events_dialog_menu_add(UiScheduledEventsDialog *self)
+struct _UiScheduledEventsDialogContextData {
+    UiScheduledEventsDialog *dialog;
+    guint64 event_id;
+};
+
+static void _ui_scheduled_events_dialog_menu_add(struct _UiScheduledEventsDialogContextData *data)
 {
-    GtkWidget *dialog = ui_add_scheduled_event_dialog_new(GTK_WINDOW(self));
+    GtkWidget *dialog = ui_add_scheduled_event_dialog_new(GTK_WINDOW(data->dialog));
 
     GtkResponseType result = gtk_dialog_run(GTK_DIALOG(dialog));
 
@@ -130,14 +135,26 @@ static void _ui_scheduled_events_dialog_menu_add(UiScheduledEventsDialog *self)
         fprintf(stderr, "add new scheduled event\n");
 
         if (event) {
-            scheduled_event_add(self->priv->recorder, event->channel_id, event->time_start, event->time_end);
+            scheduled_event_add(data->dialog->priv->recorder, event->channel_id, event->time_start, event->time_end);
         }
 
-        ui_scheduled_events_dialog_update_list(self);
+        ui_scheduled_events_dialog_update_list(data->dialog);
     }
 
     if (GTK_IS_DIALOG(dialog))
         gtk_widget_destroy(dialog);
+
+    g_free(data);
+}
+
+static void _ui_scheduled_events_dialog_menu_remove(struct _UiScheduledEventsDialogContextData *data)
+{
+    fprintf(stderr, "remove %" G_GUINT64_FORMAT "\n", data->event_id);
+
+    scheduled_event_remove(data->dialog->priv->recorder, data->event_id);
+    ui_scheduled_events_dialog_update_list(data->dialog);
+
+    g_free(data);
 }
 
 static void _ui_scheduled_events_dialog_context_popup_menu(UiScheduledEventsDialog *self,
@@ -145,13 +162,23 @@ static void _ui_scheduled_events_dialog_context_popup_menu(UiScheduledEventsDial
 {
     GtkWidget *menu;
     GtkWidget *item;
+    struct _UiScheduledEventsDialogContextData *data = g_malloc(sizeof(struct _UiScheduledEventsDialogContextData));
+
+    data->dialog = self;
+    data->event_id = event_id;
 
     menu = gtk_menu_new();
     item = gtk_menu_item_new_with_label(_("Add"));
     g_signal_connect_swapped(G_OBJECT(item), "activate",
-            G_CALLBACK(_ui_scheduled_events_dialog_menu_add), self);
+            G_CALLBACK(_ui_scheduled_events_dialog_menu_add), data);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
 
+    item = gtk_menu_item_new_with_label(_("Remove"));
+    g_signal_connect_swapped(G_OBJECT(item), "activate",
+            G_CALLBACK(_ui_scheduled_events_dialog_menu_remove), data);
+    if (!event_id)
+        gtk_widget_set_sensitive(item, FALSE);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
     /* remove, edit */
 
     gtk_widget_show_all(menu);
@@ -240,13 +267,15 @@ static void ui_scheduled_events_dialog_init(UiScheduledEventsDialog *self)
     populate_widget(self);
 
     ui_scheduled_events_dialog_update_list(self);
+
+    gtk_window_set_default_size(GTK_WINDOW(self), 400, 300);
 }
 
 void _ui_scheduled_events_dialog_fill_list_cb(ScheduledEvent *event, UiScheduledEventsDialog *self)
 {
     GtkTreeIter iter;
 
-    gtk_list_store_append(self->priv->store, &iter);
+    gtk_list_store_prepend(self->priv->store, &iter);
     gtk_list_store_set(self->priv->store, &iter,
             SE_ROW_EVENT_ID, event->id,
             SE_ROW_CHNL_ID, event->channel_id,
