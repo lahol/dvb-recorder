@@ -296,7 +296,7 @@ void main_action_record(void)
     else {
         LOG("Start recording.\n");
         dvb_recorder_record_start(appdata.recorder);
-        appdata.record_status_update_source = g_timeout_add_seconds(1, main_update_record_status, NULL);
+/*        appdata.record_status_update_source = g_timeout_add_seconds(1, main_update_record_status, NULL);*/
     }
 }
 
@@ -537,6 +537,8 @@ gboolean main_update_record_status(gpointer userdata)
         g_free(markup);
     }
 
+    if (recstatus.status != DVB_RECORD_STATUS_RECORDING)
+        appdata.record_status_update_source = 0;
     return (gboolean)(recstatus.status == DVB_RECORD_STATUS_RECORDING);
 }
 
@@ -560,7 +562,7 @@ void main_menu_show_video_settings_dialog(void)
 
 void main_menu_show_add_scheduled_events_dialog(void)
 {
-    ui_add_scheduled_event_dialog_show(widgets.main_window);
+    ui_add_scheduled_event_dialog_show(widgets.main_window, appdata.recorder);
 }
 
 void _main_add_accelerator(GtkWidget *item, const gchar *accel_signal, GtkAccelGroup *accel_group,
@@ -991,6 +993,7 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
             switch (((DVBRecorderEventRecordStatusChanged *)event)->status) {
                 case DVB_RECORD_STATUS_RECORDING:
                     appdata.is_recording = 1;
+                    appdata.record_status_update_source = g_timeout_add_seconds(1, main_update_record_status, NULL);
                     break;
                 default:
                     if (appdata.is_recording) {
@@ -1222,6 +1225,8 @@ int main(int argc, char **argv)
         ui_sidebar_channels_set_current_signal_source(UI_SIDEBAR_CHANNELS(widgets.channel_list), appstatus.recorder.signal_source);
         ui_sidebar_channels_set_current_channel(UI_SIDEBAR_CHANNELS(widgets.channel_list), appstatus.recorder.channel_id, FALSE);
     }
+
+    dvb_recorder_enable_scheduled_events(appdata.recorder, TRUE);
 
     gtk_main();
 

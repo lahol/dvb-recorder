@@ -17,4 +17,4 @@ void favourites_dialog_show(GtkWidget *parent, DVBRecorder *recorder, guint32 li
                             CHANNEL_FAVOURITES_DIALOG_UPDATE_NOTIFY notify_cb, gpointer userdata);
 void ui_recorder_settings_dialog_show(GtkWidget *parent, DVBRecorder *recorder);
 void video_settings_dialog_show(GtkWidget *parent, VideoOutput *vo);
-void ui_add_scheduled_event_dialog_show(GtkWidget *parent);
+void ui_add_scheduled_event_dialog_show(GtkWidget *parent, DVBRecorder *recorder);

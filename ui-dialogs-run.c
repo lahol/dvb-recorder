@@ -102,7 +102,7 @@ void video_settings_dialog_show(GtkWidget *parent, VideoOutput *vo)
         gtk_widget_destroy(dialog);
 }
 
-void ui_add_scheduled_event_dialog_show(GtkWidget *parent)
+void ui_add_scheduled_event_dialog_show(GtkWidget *parent, DVBRecorder *recorder)
 {
     GtkWidget *dialog = ui_add_scheduled_event_dialog_new(GTK_WINDOW(parent));
 
@@ -113,6 +113,10 @@ void ui_add_scheduled_event_dialog_show(GtkWidget *parent)
         ScheduledEvent *event = NULL;
         g_object_get(G_OBJECT(dialog), "scheduled-event", &event, NULL);
         fprintf(stderr, "add new scheduled event\n");
+
+        if (event) {
+            scheduled_event_add(recorder, event->channel_id, event->time_start, event->time_end);
+        }
     }
 
     if (GTK_IS_DIALOG(dialog))
