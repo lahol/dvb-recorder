@@ -565,6 +565,11 @@ void main_menu_show_add_scheduled_events_dialog(void)
     ui_add_scheduled_event_dialog_show(widgets.main_window, appdata.recorder);
 }
 
+void main_menu_show_scheduled_events_dialog(void)
+{
+    ui_scheduled_events_dialog_show(widgets.main_window, appdata.recorder);
+}
+
 void _main_add_accelerator(GtkWidget *item, const gchar *accel_signal, GtkAccelGroup *accel_group,
         guint accel_key, GdkModifierType accel_mods, GtkAccelFlags accel_flags,
         GCallback accel_cb, gpointer accel_data)
@@ -616,9 +621,9 @@ GtkWidget *main_create_context_menu(void)
             G_CALLBACK(main_menu_show_video_settings_dialog), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(popup), item);
 
-    item = gtk_menu_item_new_with_label(_("Add scheduled event"));
+    item = gtk_menu_item_new_with_label(_("Scheduled recordings"));
     g_signal_connect_swapped(G_OBJECT(item), "activate",
-            G_CALLBACK(main_menu_show_add_scheduled_events_dialog), NULL);
+            G_CALLBACK(main_menu_show_scheduled_events_dialog), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(popup), item);
 
     item = gtk_separator_menu_item_new();

@@ -123,3 +123,14 @@ void ui_add_scheduled_event_dialog_show(GtkWidget *parent, DVBRecorder *recorder
         gtk_widget_destroy(dialog);
 }
 
+void ui_scheduled_events_dialog_show(GtkWidget *parent, DVBRecorder *recorder)
+{
+    GtkWidget *dialog = ui_scheduled_events_dialog_new(GTK_WINDOW(parent));
+    g_object_set(G_OBJECT(dialog), "recorder", recorder, NULL);
+
+    gtk_dialog_run(GTK_DIALOG(dialog));
+
+    if (GTK_IS_DIALOG(dialog))
+        gtk_widget_destroy(dialog);
+}
+

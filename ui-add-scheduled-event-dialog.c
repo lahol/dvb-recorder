@@ -152,7 +152,7 @@ static void populate_widget(UiAddScheduledEventDialog *self)
     gtk_container_set_border_width(GTK_CONTAINER(grid), 3);
 
     self->priv->channel_list = channel_list_new(TRUE);
-    gtk_grid_attach(GTK_GRID(grid), self->priv->channel_list, 0, 0, 1, 3);
+    gtk_grid_attach(GTK_GRID(grid), self->priv->channel_list, 0, 0, 1, 4);
     gtk_widget_set_hexpand(self->priv->channel_list, TRUE);
     gtk_widget_set_vexpand(self->priv->channel_list, TRUE);
 
