@@ -898,9 +898,6 @@ void main_recorder_channel_selected_cb(UiSidebarChannels *sidebar, guint channel
 
     dvb_recorder_set_channel(appdata.recorder, (guint64)channel_id);
 
-    appstatus.recorder.channel_id = channel_id;
-    appstatus.recorder.running = 1;
-
     /*
     gtk_window_present(GTK_WINDOW(widgets.main_window));
     */
@@ -1062,6 +1059,14 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
             LOG("SDT changed\n");
             appdata.is_sdt_ready = 1;
             main_notify_channel_change();
+            break;
+        case DVB_RECORDER_EVENT_CHANNEL_CHANGED:
+            LOG("Channel changed to %u\n", ((DVBRecorderEventChannelChanged *)event)->channel_id);
+            appstatus.recorder.channel_id = ((DVBRecorderEventChannelChanged *)event)->channel_id;
+            appstatus.recorder.running = 1;
+
+            ui_sidebar_channels_set_current_channel(UI_SIDEBAR_CHANNELS(widgets.channel_list),
+                    appstatus.recorder.channel_id, FALSE);
             break;
         default:
             break;
