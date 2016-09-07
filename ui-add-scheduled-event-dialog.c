@@ -19,6 +19,15 @@ struct _UiAddScheduledEventDialogPrivate {
     GtkWidget *duration_edit;
 
     ScheduledEvent event;
+    guint validation_flags;
+};
+
+enum {
+    VALID_FLAG_CHANNEL  = (1 << 0),
+    VALID_FLAG_DATE     = (1 << 1),
+    VALID_FLAG_TIME     = (1 << 2),
+    VALID_FLAG_DURATION = (1 << 3),
+    VALID_FLAG_ALL      = 0x0f
 };
 
 G_DEFINE_TYPE(UiAddScheduledEventDialog, ui_add_scheduled_event_dialog, GTK_TYPE_DIALOG);
@@ -33,6 +42,7 @@ enum {
 void ui_add_scheduled_event_dialog_set_parent(UiAddScheduledEventDialog *dialog, GtkWindow *parent);
 void ui_add_scheduled_event_dialog_set_event(UiAddScheduledEventDialog *dialog, ScheduledEvent *event);
 void ui_add_scheduled_event_dialog_update_event(UiAddScheduledEventDialog *dialog);
+static gboolean ui_add_scheduled_events_dialog_validate(UiAddScheduledEventDialog *dialog);
 
 static void ui_add_scheduled_event_dialog_dispose(GObject *gobject)
 {
@@ -113,32 +123,17 @@ static void ui_add_scheduled_event_dialog_class_init(UiAddScheduledEventDialogCl
     g_type_class_add_private(G_OBJECT_CLASS(klass), sizeof(UiAddScheduledEventDialogPrivate));
 }
 
-static void _ui_add_scheduled_event_dialog_cursor_changed(UiAddScheduledEventDialog *self, GtkTreeView *tree_view)
+/*static void _ui_add_scheduled_event_dialog_cursor_changed(UiAddScheduledEventDialog *self, GtkTreeView *tree_view)*/
+static void ui_add_scheduled_event_dialog_changed(UiAddScheduledEventDialog *self)
 {
-    GtkTreePath *path = NULL;
-
-    gtk_tree_view_get_cursor(tree_view, &path, NULL);
-
-    if (!path)
-        return;
-
-    GtkTreeIter iter;
-    GtkTreeModel *model = gtk_tree_view_get_model(tree_view);
-    if (model == NULL || !gtk_tree_model_get_iter(model, &iter, path)) {
-        gtk_tree_path_free(path);
-        return;
-    }
-
-    guint32 selection_id;
-
-    gtk_tree_model_get(model, &iter, CHNL_ROW_ID, &selection_id, -1);
-
-    gtk_tree_path_free(path);
-
-    fprintf(stderr, "channel id: %u\n", selection_id);
-
-    self->priv->event.channel_id = selection_id;
+    gtk_dialog_set_response_sensitive(GTK_DIALOG(self),
+                                      GTK_RESPONSE_ACCEPT,
+                                      ui_add_scheduled_events_dialog_validate(self));
 }
+
+/*static void _ui_add_scheduled_event_dialog_editable_changed(UiAddScheduledEventDialog *self, GtkEditable *editable)
+{
+}*/
 
 static void populate_widget(UiAddScheduledEventDialog *self)
 {
@@ -158,6 +153,8 @@ static void populate_widget(UiAddScheduledEventDialog *self)
 
     GtkTreeView *tv = channel_list_get_tree_view(CHANNEL_LIST(self->priv->channel_list));
     gtk_tree_view_set_activate_on_single_click(tv, TRUE);
+    g_signal_connect_swapped(G_OBJECT(tv), "cursor-changed",
+            G_CALLBACK(ui_add_scheduled_event_dialog_changed), self);
 
     self->priv->date_select = gtk_calendar_new();
     gtk_grid_attach(GTK_GRID(grid), self->priv->date_select, 0, 0, 2, 1);
@@ -166,12 +163,16 @@ static void populate_widget(UiAddScheduledEventDialog *self)
     gtk_grid_attach(GTK_GRID(grid), label, 0, 1, 1, 1);
 
     self->priv->time_edit = gtk_entry_new();
+    g_signal_connect_swapped(G_OBJECT(self->priv->time_edit), "changed",
+            G_CALLBACK(ui_add_scheduled_event_dialog_changed), self);
     gtk_grid_attach(GTK_GRID(grid), self->priv->time_edit, 1, 1, 1, 1);
 
     label = gtk_label_new("Duration:");
     gtk_grid_attach(GTK_GRID(grid), label, 0, 2, 1, 1);
 
     self->priv->duration_edit = gtk_entry_new();
+    g_signal_connect_swapped(G_OBJECT(self->priv->duration_edit), "changed",
+            G_CALLBACK(ui_add_scheduled_event_dialog_changed), self);
     gtk_grid_attach(GTK_GRID(grid), self->priv->duration_edit, 1, 2, 1, 1);
 
     gtk_box_pack_start(GTK_BOX(hbox), grid, FALSE, FALSE, 0);
@@ -184,6 +185,8 @@ static void populate_widget(UiAddScheduledEventDialog *self)
             _("_Add"), GTK_RESPONSE_ACCEPT,
             _("_Close"), GTK_RESPONSE_CLOSE,
             NULL);
+
+    gtk_dialog_set_response_sensitive(GTK_DIALOG(self), GTK_RESPONSE_ACCEPT, FALSE);
 }
 
 static void ui_add_scheduled_event_dialog_init(UiAddScheduledEventDialog *self)
@@ -218,61 +221,67 @@ void ui_add_scheduled_event_dialog_update_event(UiAddScheduledEventDialog *dialo
     GtkTreeView *tv = channel_list_get_tree_view(CHANNEL_LIST(dialog->priv->channel_list));
     GtkTreePath *path = NULL;
 
-    gtk_tree_view_get_cursor(tv, &path, NULL);
-
-    if (!path)
-        return;
+    dialog->priv->validation_flags = 0;
 
     GtkTreeIter iter;
     GtkTreeModel *model = gtk_tree_view_get_model(tv);
-    if (model == NULL || !gtk_tree_model_get_iter(model, &iter, path)) {
+    gtk_tree_view_get_cursor(tv, &path, NULL);
+
+    if (!path || model == NULL || !gtk_tree_model_get_iter(model, &iter, path)) {
         gtk_tree_path_free(path);
-        return;
     }
+    else {
+        guint32 selection_id;
 
-    guint32 selection_id;
+        gtk_tree_model_get(model, &iter, CHNL_ROW_ID, &selection_id, -1);
 
-    gtk_tree_model_get(model, &iter, CHNL_ROW_ID, &selection_id, -1);
+        gtk_tree_path_free(path);
 
-    gtk_tree_path_free(path);
+        dialog->priv->event.channel_id = selection_id;
 
-    fprintf(stderr, "channel id: %u\n", selection_id);
-
-    dialog->priv->event.channel_id = selection_id;
+        dialog->priv->validation_flags |= VALID_FLAG_CHANNEL;
+    }
 
     guint year, month, day;
     gtk_calendar_get_date(GTK_CALENDAR(dialog->priv->date_select), &year, &month, &day);
+    dialog->priv->validation_flags |= VALID_FLAG_DATE;
 
-    fprintf(stderr, "date: %02u.%02u.%04u\n", day, month + 1, year);
-
-    gchar **time_buf = g_strsplit(gtk_entry_get_text(GTK_ENTRY(dialog->priv->time_edit)), ":", 0);
     guint hour = 0, min = 0;
-    if (time_buf[0]) {
-        hour = strtoul(time_buf[0], NULL, 10);
-        if (time_buf[1])
-            min = strtoul(time_buf[1], NULL, 10);
+    const gchar *entry_text = gtk_entry_get_text(GTK_ENTRY(dialog->priv->time_edit));
+    if (g_regex_match_simple("^([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$", entry_text, G_REGEX_RAW, 0)) {
+        gchar **time_buf = g_strsplit(entry_text, ":", 0);
+        if (time_buf[0]) {
+            hour = strtoul(time_buf[0], NULL, 10);
+            if (time_buf[1])
+                min = strtoul(time_buf[1], NULL, 10);
+        }
+
+        g_strfreev(time_buf);
+        dialog->priv->validation_flags |= VALID_FLAG_TIME;
     }
 
-    fprintf(stderr, "time: %02u:%02u\n", hour, min);
+    entry_text = gtk_entry_get_text(GTK_ENTRY(dialog->priv->duration_edit));
+    if (g_regex_match_simple("^[1-9][0-9]*$", entry_text, G_REGEX_RAW, 0)) {
+        guint duration = strtoul(entry_text, NULL, 10);
+        dialog->priv->validation_flags |= VALID_FLAG_DURATION;
 
-    g_strfreev(time_buf);
-
-    guint duration = strtoul(gtk_entry_get_text(GTK_ENTRY(dialog->priv->duration_edit)), NULL, 10);
-    fprintf(stderr, "duration: %u\n", duration);
-
-    struct tm tm;
-    tm.tm_sec = 0;
-    tm.tm_min = min;
-    tm.tm_hour = hour;
-    tm.tm_mday = day;
-    tm.tm_mon = month;
-    tm.tm_year = year - 1900;
-    tm.tm_wday = 0;
-    tm.tm_yday = 0;
-    tm.tm_isdst = -1;
-    dialog->priv->event.time_start = (guint64)mktime(&tm);
-    dialog->priv->event.time_end = dialog->priv->event.time_start + 60 * duration;
-
-    fprintf(stderr, "from %" G_GUINT64_FORMAT " to %" G_GUINT64_FORMAT "\n", dialog->priv->event.time_start, dialog->priv->event.time_end);
+        struct tm tm;
+        tm.tm_sec = 0;
+        tm.tm_min = min;
+        tm.tm_hour = hour;
+        tm.tm_mday = day;
+        tm.tm_mon = month;
+        tm.tm_year = year - 1900;
+        tm.tm_wday = 0;
+        tm.tm_yday = 0;
+        tm.tm_isdst = -1;
+        dialog->priv->event.time_start = (guint64)mktime(&tm);
+        dialog->priv->event.time_end = dialog->priv->event.time_start + 60 * duration;
+    }
 }
 
+static gboolean ui_add_scheduled_events_dialog_validate(UiAddScheduledEventDialog *dialog)
+{
+    ui_add_scheduled_event_dialog_update_event(dialog);
+    return (gboolean)(dialog->priv->validation_flags == VALID_FLAG_ALL);
+}
