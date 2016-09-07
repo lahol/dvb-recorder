@@ -151,35 +151,32 @@ static void populate_widget(UiAddScheduledEventDialog *self)
     gtk_grid_set_row_spacing(GTK_GRID(grid), 3);
     gtk_container_set_border_width(GTK_CONTAINER(grid), 3);
 
+    GtkWidget *hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 3);
+
     self->priv->channel_list = channel_list_new(TRUE);
-    gtk_grid_attach(GTK_GRID(grid), self->priv->channel_list, 0, 0, 1, 4);
-    gtk_widget_set_hexpand(self->priv->channel_list, TRUE);
-    gtk_widget_set_vexpand(self->priv->channel_list, TRUE);
+    gtk_box_pack_start(GTK_BOX(hbox), self->priv->channel_list, TRUE, TRUE, 0);
 
     GtkTreeView *tv = channel_list_get_tree_view(CHANNEL_LIST(self->priv->channel_list));
     gtk_tree_view_set_activate_on_single_click(tv, TRUE);
-/*    g_signal_connect_swapped(G_OBJECT(tv), "row-activated",
-            G_CALLBACK(_ui_add_scheduled_event_dialog_row_activated), self);*/
-/*    g_signal_connect_swapped(G_OBJECT(tv), "cursor-changed",
-            G_CALLBACK(_ui_add_scheduled_event_dialog_cursor_changed), self);*/
-
 
     self->priv->date_select = gtk_calendar_new();
-    gtk_grid_attach(GTK_GRID(grid), self->priv->date_select, 1, 0, 2, 1);
+    gtk_grid_attach(GTK_GRID(grid), self->priv->date_select, 0, 0, 2, 1);
 
     GtkWidget *label = gtk_label_new("Start:");
-    gtk_grid_attach(GTK_GRID(grid), label, 1, 1, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), label, 0, 1, 1, 1);
 
     self->priv->time_edit = gtk_entry_new();
-    gtk_grid_attach(GTK_GRID(grid), self->priv->time_edit, 2, 1, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), self->priv->time_edit, 1, 1, 1, 1);
 
     label = gtk_label_new("Duration:");
-    gtk_grid_attach(GTK_GRID(grid), label, 1, 2, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), label, 0, 2, 1, 1);
 
     self->priv->duration_edit = gtk_entry_new();
-    gtk_grid_attach(GTK_GRID(grid), self->priv->duration_edit, 2, 2, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), self->priv->duration_edit, 1, 2, 1, 1);
 
-    gtk_container_add(GTK_CONTAINER(content_area), grid);
+    gtk_box_pack_start(GTK_BOX(hbox), grid, FALSE, FALSE, 0);
+
+    gtk_container_add(GTK_CONTAINER(content_area), hbox);
 
     gtk_widget_show_all(content_area);
 
