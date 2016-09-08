@@ -17,6 +17,7 @@ struct _UiAddScheduledEventDialogPrivate {
     GtkWidget *date_select;
     GtkWidget *time_edit;
     GtkWidget *duration_edit;
+    GtkWidget *msg_label;
 
     ScheduledEvent event;
     guint validation_flags;
@@ -129,6 +130,22 @@ static void ui_add_scheduled_event_dialog_changed(UiAddScheduledEventDialog *sel
     gtk_dialog_set_response_sensitive(GTK_DIALOG(self),
                                       GTK_RESPONSE_ACCEPT,
                                       ui_add_scheduled_events_dialog_validate(self));
+    guint conflicts = 0;
+    if ((self->priv->validation_flags & VALID_FLAG_TIME) &&
+        (self->priv->validation_flags & VALID_FLAG_DURATION)) {
+        conflicts = scheduled_event_check_conflict(self->priv->event.time_start, self->priv->event.time_end);
+    }
+
+    gchar tbuf[256];
+
+    if (conflicts) {
+        sprintf(tbuf, conflicts == 1 ? "There is %u conflict." : "There are %u conflicts.", conflicts);
+    }
+    else {
+        tbuf[0] = ' ';
+        tbuf[1] = 0;
+    }
+    gtk_label_set_text(GTK_LABEL(self->priv->msg_label), tbuf);
 }
 
 /*static void _ui_add_scheduled_event_dialog_editable_changed(UiAddScheduledEventDialog *self, GtkEditable *editable)
@@ -177,7 +194,11 @@ static void populate_widget(UiAddScheduledEventDialog *self)
 
     gtk_box_pack_start(GTK_BOX(hbox), grid, FALSE, FALSE, 0);
 
-    gtk_container_add(GTK_CONTAINER(content_area), hbox);
+    gtk_box_pack_start(GTK_BOX(content_area), hbox, TRUE, TRUE, 3);
+
+    self->priv->msg_label = gtk_label_new(" ");
+    gtk_widget_set_halign(self->priv->msg_label, GTK_ALIGN_END);
+    gtk_box_pack_end(GTK_BOX(content_area), self->priv->msg_label, FALSE, FALSE, 3);
 
     gtk_widget_show_all(content_area);
 
@@ -304,13 +325,6 @@ void ui_add_scheduled_event_dialog_update_event(UiAddScheduledEventDialog *dialo
 static gboolean ui_add_scheduled_events_dialog_validate(UiAddScheduledEventDialog *dialog)
 {
     ui_add_scheduled_event_dialog_update_event(dialog);
-
-    guint conflicts = 0;
-    if ((dialog->priv->validation_flags & VALID_FLAG_TIME) &&
-        (dialog->priv->validation_flags & VALID_FLAG_DURATION)) {
-        conflicts = scheduled_event_check_conflict(dialog->priv->event.time_start, dialog->priv->event.time_end);
-    }
-    fprintf(stderr, "number of conflicts: %u\n", conflicts);
 
     return (gboolean)(dialog->priv->validation_flags == VALID_FLAG_ALL);
 }
