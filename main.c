@@ -562,7 +562,7 @@ void main_menu_show_video_settings_dialog(void)
 
 void main_menu_show_add_scheduled_events_dialog(void)
 {
-    ui_add_scheduled_event_dialog_show(widgets.main_window, appdata.recorder);
+    ui_add_scheduled_event_dialog_show(widgets.main_window, appdata.recorder, 0);
 }
 
 void main_menu_show_scheduled_events_dialog(void)

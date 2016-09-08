@@ -2,6 +2,7 @@
 #include "config.h"
 #include <dvbrecorder/dvb-scanner.h>
 #include <dvbrecorder/scheduled.h>
+#include <string.h>
 
 GtkResponseType ui_dialog_scan_show(GtkWidget *parent, DVBRecorder *recorder)
 {
@@ -102,9 +103,27 @@ void video_settings_dialog_show(GtkWidget *parent, VideoOutput *vo)
         gtk_widget_destroy(dialog);
 }
 
-void ui_add_scheduled_event_dialog_show(GtkWidget *parent, DVBRecorder *recorder)
+gboolean ui_add_scheduled_event_dialog_show(GtkWidget *parent, DVBRecorder *recorder, guint event_id)
 {
+    gboolean changed = FALSE;
     GtkWidget *dialog = ui_add_scheduled_event_dialog_new(GTK_WINDOW(parent));
+
+    ScheduledEvent ev, *pev = NULL;
+    memset(&ev, 0, sizeof(ScheduledEvent));
+
+    if (event_id)
+        pev = scheduled_event_get(event_id);
+    if (pev) {
+        ev = *pev;
+        g_free(pev);
+    }
+    else {
+        ev.id = event_id;
+        ev.channel_id = dvb_recorder_get_current_channel(recorder);
+        ev.time_start = time(NULL);
+        ev.time_end = ev.time_start + 60 * 30;
+    }
+    g_object_set(G_OBJECT(dialog), "scheduled-event", &ev, NULL);
 
     GtkResponseType result = gtk_dialog_run(GTK_DIALOG(dialog));
 
@@ -115,12 +134,16 @@ void ui_add_scheduled_event_dialog_show(GtkWidget *parent, DVBRecorder *recorder
         fprintf(stderr, "add new scheduled event\n");
 
         if (event) {
-            scheduled_event_add(recorder, event->channel_id, event->time_start, event->time_end);
+            scheduled_event_set(recorder, event);
         }
+
+        changed = TRUE;
     }
 
     if (GTK_IS_DIALOG(dialog))
         gtk_widget_destroy(dialog);
+
+    return changed;
 }
 
 void ui_scheduled_events_dialog_show(GtkWidget *parent, DVBRecorder *recorder)

@@ -5,6 +5,7 @@
 #include <dvbrecorder/scheduled.h>
 #include <dvbrecorder/channel-db.h>
 #include "ui-add-scheduled-event-dialog.h"
+#include "ui-dialogs-run.h"
 #include <time.h>
 
 struct _UiScheduledEventsDialogPrivate {
@@ -124,27 +125,14 @@ struct _UiScheduledEventsDialogContextData {
 
 static void _ui_scheduled_events_dialog_menu_add(struct _UiScheduledEventsDialogContextData *data)
 {
-    GtkWidget *dialog = ui_add_scheduled_event_dialog_new(GTK_WINDOW(data->dialog));
-
-    GtkResponseType result = gtk_dialog_run(GTK_DIALOG(dialog));
-
-    if (result == GTK_RESPONSE_ACCEPT) {
-        /* get event */
-        ScheduledEvent *event = NULL;
-        g_object_get(G_OBJECT(dialog), "scheduled-event", &event, NULL);
-        fprintf(stderr, "add new scheduled event\n");
-
-        if (event) {
-            scheduled_event_add(data->dialog->priv->recorder, event->channel_id, event->time_start, event->time_end);
-        }
-
+    if (ui_add_scheduled_event_dialog_show(GTK_WIDGET(data->dialog), data->dialog->priv->recorder, 0))
         ui_scheduled_events_dialog_update_list(data->dialog);
-    }
+}
 
-    if (GTK_IS_DIALOG(dialog))
-        gtk_widget_destroy(dialog);
-
-    g_free(data);
+static void _ui_scheduled_events_dialog_menu_edit(struct _UiScheduledEventsDialogContextData *data)
+{
+    if (ui_add_scheduled_event_dialog_show(GTK_WIDGET(data->dialog), data->dialog->priv->recorder, data->event_id))
+        ui_scheduled_events_dialog_update_list(data->dialog);
 }
 
 static void _ui_scheduled_events_dialog_menu_remove(struct _UiScheduledEventsDialogContextData *data)
@@ -153,8 +141,11 @@ static void _ui_scheduled_events_dialog_menu_remove(struct _UiScheduledEventsDia
 
     scheduled_event_remove(data->dialog->priv->recorder, data->event_id);
     ui_scheduled_events_dialog_update_list(data->dialog);
+}
 
-    g_free(data);
+static void _ui_scheduled_events_dialog_menu_destroy(GtkWidget *menu, gpointer userdata)
+{
+    g_free(userdata);
 }
 
 static void _ui_scheduled_events_dialog_context_popup_menu(UiScheduledEventsDialog *self,
@@ -168,9 +159,17 @@ static void _ui_scheduled_events_dialog_context_popup_menu(UiScheduledEventsDial
     data->event_id = event_id;
 
     menu = gtk_menu_new();
+    g_signal_connect(G_OBJECT(menu), "selection-done",
+            G_CALLBACK(_ui_scheduled_events_dialog_menu_destroy), data);
+
     item = gtk_menu_item_new_with_label(_("Add"));
     g_signal_connect_swapped(G_OBJECT(item), "activate",
             G_CALLBACK(_ui_scheduled_events_dialog_menu_add), data);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+
+    item = gtk_menu_item_new_with_label(_("Edit"));
+    g_signal_connect_swapped(G_OBJECT(item), "activate",
+            G_CALLBACK(_ui_scheduled_events_dialog_menu_edit), data);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
 
     item = gtk_menu_item_new_with_label(_("Remove"));
@@ -179,7 +178,6 @@ static void _ui_scheduled_events_dialog_context_popup_menu(UiScheduledEventsDial
     if (!event_id)
         gtk_widget_set_sensitive(item, FALSE);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
-    /* remove, edit */
 
     gtk_widget_show_all(menu);
     gtk_menu_popup(GTK_MENU(menu), NULL, NULL, NULL, NULL, event->button, event->time);

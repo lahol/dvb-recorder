@@ -486,8 +486,13 @@ void ui_sidebar_channels_set_current_channel(UiSidebarChannels *sidebar, guint32
 
     GtkTreeIter iter;
 
-    if (!ui_sidebar_channels_find_channel_by_id(sidebar, id, &iter))
+    if (!ui_sidebar_channels_find_channel_by_id(sidebar, id, &iter)) {
+        GtkTreePath *invalid_path = gtk_tree_path_new();
+        gtk_tree_view_set_cursor(channel_list_get_tree_view(CHANNEL_LIST(sidebar->priv->channel_list)),
+                invalid_path, NULL, FALSE);
+        gtk_tree_path_free(invalid_path);
         return;
+    }
 
     GtkTreePath *path = gtk_tree_model_get_path(GTK_TREE_MODEL(sidebar->priv->channel_list_store), &iter);
 

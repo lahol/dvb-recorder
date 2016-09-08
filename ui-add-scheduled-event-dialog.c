@@ -214,6 +214,27 @@ void ui_add_scheduled_event_dialog_set_parent(UiAddScheduledEventDialog *dialog,
 
 void ui_add_scheduled_event_dialog_set_event(UiAddScheduledEventDialog *dialog, ScheduledEvent *event)
 {
+    if (!event)
+        return;
+
+    dialog->priv->event = *event;
+
+    channel_list_set_channel_selection(CHANNEL_LIST(dialog->priv->channel_list), event->channel_id);
+
+    struct tm *tm = localtime((time_t *)&event->time_start);
+    g_object_set(G_OBJECT(dialog->priv->date_select),
+            "day", tm->tm_mday,
+            "month", tm->tm_mon,
+            "year", tm->tm_year + 1900,
+            NULL);
+
+    gchar tbuf[32];
+
+    sprintf(tbuf, "%02u:%02u", tm->tm_hour, tm->tm_min);
+    gtk_entry_set_text(GTK_ENTRY(dialog->priv->time_edit), tbuf);
+
+    sprintf(tbuf, "%u", (guint)((event->time_end - event->time_start)/60));
+    gtk_entry_set_text(GTK_ENTRY(dialog->priv->duration_edit), tbuf);
 }
 
 void ui_add_scheduled_event_dialog_update_event(UiAddScheduledEventDialog *dialog)
@@ -283,5 +304,13 @@ void ui_add_scheduled_event_dialog_update_event(UiAddScheduledEventDialog *dialo
 static gboolean ui_add_scheduled_events_dialog_validate(UiAddScheduledEventDialog *dialog)
 {
     ui_add_scheduled_event_dialog_update_event(dialog);
+
+    guint conflicts = 0;
+    if ((dialog->priv->validation_flags & VALID_FLAG_TIME) &&
+        (dialog->priv->validation_flags & VALID_FLAG_DURATION)) {
+        conflicts = scheduled_event_check_conflict(dialog->priv->event.time_start, dialog->priv->event.time_end);
+    }
+    fprintf(stderr, "number of conflicts: %u\n", conflicts);
+
     return (gboolean)(dialog->priv->validation_flags == VALID_FLAG_ALL);
 }

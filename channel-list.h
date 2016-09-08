@@ -50,4 +50,6 @@ void channel_list_clear(ChannelList *channel_list);
 void channel_list_set_active_signal_source(ChannelList *channel_list, const gchar *signal_source);
 const gchar *channel_list_get_active_signal_source(ChannelList *channel_list);
 
+void channel_list_set_channel_selection(ChannelList *channel_list, guint32 id);
+
 G_END_DECLS

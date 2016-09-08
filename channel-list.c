@@ -454,3 +454,39 @@ const gchar *channel_list_get_active_signal_source(ChannelList *channel_list)
 
     return NULL;
 }
+
+static gboolean channel_list_find_channel_by_id(ChannelList *self, guint32 id, GtkTreeIter *match)
+{
+    GtkTreeIter iter;
+    gboolean valid;
+    gint row_id;
+
+    for (valid = gtk_tree_model_get_iter_first(GTK_TREE_MODEL(self->priv->channels_store), &iter);
+         valid;
+         valid = gtk_tree_model_iter_next(GTK_TREE_MODEL(self->priv->channels_store), &iter)) {
+        gtk_tree_model_get(GTK_TREE_MODEL(self->priv->channels_store), &iter, CHNL_ROW_ID, &row_id, -1);
+        if ((guint32)row_id == id) {
+            if (match)
+                *match = iter;
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+void channel_list_set_channel_selection(ChannelList *channel_list, guint32 id)
+{
+    GtkTreeIter iter;
+    if (!channel_list_find_channel_by_id(channel_list, id, &iter))
+        return;
+
+    GtkTreePath *path = gtk_tree_model_get_path(GTK_TREE_MODEL(channel_list->priv->channels_store), &iter);
+
+    if (path) {
+        gtk_tree_view_set_cursor(GTK_TREE_VIEW(channel_list->priv->channel_tree_view), path, NULL, FALSE);
+        gtk_tree_view_scroll_to_cell(GTK_TREE_VIEW(channel_list->priv->channel_tree_view), path, NULL, FALSE, 0, 0);
+        gtk_tree_path_free(path);
+    }
+}
+
