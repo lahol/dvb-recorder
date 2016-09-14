@@ -42,6 +42,7 @@ struct {
         GtkWidget *volume;
         gulong volume_changed_signal;
         GtkWidget *mute;
+        GtkWidget *refresh;
     } buttons;
 
     GtkWidget *status_label;
@@ -441,6 +442,12 @@ void main_menu_show_channel_properties_dialog(gpointer userdata)
     main_window_status_toggle_show(widgets.channel_properties_dialog, &appstatus.gui.channel_properties_dialog);
 }
 
+void main_menu_refresh_video_output(gpointer userdata)
+{
+    video_output_set_infile(appdata.video_output,
+                            dvb_recorder_enable_video_source(appdata.recorder, TRUE));
+}
+
 void main_action_quit(gpointer userdata)
 {
     DVBRecorderRecordStatus recstatus;
@@ -626,6 +633,11 @@ GtkWidget *main_create_context_menu(void)
             G_CALLBACK(main_menu_show_scheduled_events_dialog), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(popup), item);
 
+    item = gtk_menu_item_new_with_label(_("Refresh video"));
+    g_signal_connect_swapped(G_OBJECT(item), "activate",
+            G_CALLBACK(main_menu_refresh_video_output), NULL);
+    gtk_menu_shell_append(GTK_MENU_SHELL(popup), item);
+
     item = gtk_separator_menu_item_new();
     gtk_menu_shell_append(GTK_MENU_SHELL(popup), item);
 
@@ -744,6 +756,14 @@ GtkWidget *main_init_channels_dialog_buttons(void)
         g_signal_connect(G_OBJECT(widgets.buttons.volume), "value-changed",
                 G_CALLBACK(main_ui_volume_value_changed), NULL);
     gtk_box_pack_end(GTK_BOX(hbox), widgets.buttons.volume, FALSE, FALSE, 0);
+
+    widgets.buttons.refresh = gtk_button_new();
+    gtk_button_set_image(GTK_BUTTON(widgets.buttons.refresh),
+            gtk_image_new_from_icon_name("view-refresh", GTK_ICON_SIZE_LARGE_TOOLBAR));
+    gtk_widget_set_tooltip_text(widgets.buttons.refresh, _("Refresh video"));
+    g_signal_connect_swapped(G_OBJECT(widgets.buttons.refresh), "clicked",
+            G_CALLBACK(main_menu_refresh_video_output), NULL);
+    gtk_box_pack_end(GTK_BOX(hbox), widgets.buttons.refresh, FALSE, FALSE, 0);
 
     return hbox;
 }
