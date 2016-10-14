@@ -28,10 +28,11 @@ enum {
     EPG_ROW_TITLE,
     EPG_ROW_STARTTIME,
     EPG_ROW_DURATION,
-    EPG_ROW_SHORT,
-    EPG_ROW_EXTENDED,
     EPG_ROW_STARTTIME_STRING,
     EPG_ROW_DURATION_STRING,
+    EPG_ROW_RUNNING_STATUS,
+    EPG_ROW_WEIGHT,
+    EPG_ROW_WEIGHT_SET,
     EPG_N_ROWS
 };
 
@@ -196,7 +197,7 @@ static void populate_widget(UiEpgList *self)
 
     renderer = gtk_cell_renderer_text_new();
     column = gtk_tree_view_column_new_with_attributes(_("Short Description"),
-            renderer, "text", EPG_ROW_TITLE, NULL);
+            renderer, "text", EPG_ROW_TITLE, "weight", EPG_ROW_WEIGHT, "weight-set", EPG_ROW_WEIGHT_SET, NULL);
     gtk_tree_view_append_column(GTK_TREE_VIEW(self->priv->events_list), column);
 
     store = gtk_list_store_new(EPG_N_ROWS,
@@ -204,10 +205,11 @@ static void populate_widget(UiEpgList *self)
                                G_TYPE_STRING,   /* title */
                                G_TYPE_INT64,    /* starttime */
                                G_TYPE_UINT,     /* duration */
-                               G_TYPE_POINTER,  /* reserved: short desc */
-                               G_TYPE_POINTER,  /* reserved: extendet desc */
                                G_TYPE_STRING,   /* starttime as string; alternatively as cell_data_func */
-                               G_TYPE_STRING);  /* duration as string */
+                               G_TYPE_STRING,   /* duration as string */
+                               G_TYPE_UINT,     /* running status */
+                               G_TYPE_INT,
+                               G_TYPE_BOOLEAN);  /* style */
 
     gtk_tree_view_set_model(GTK_TREE_VIEW(self->priv->events_list), GTK_TREE_MODEL(store));
     g_object_unref(store);
@@ -283,6 +285,8 @@ GList *_epg_list_remove_duplicates(GList *list)
             if (((EPGEvent *)tmp->prev->data)->event_id == ((EPGEvent *)tmp->data)->event_id) {
                 /* duplicate detected (event_id is unique in service definition) */
                 /* drop this event */
+                /* merge running status */
+                ((EPGEvent *)tmp->prev->data)->running_status |= ((EPGEvent *)tmp->data)->running_status;
                 epg_event_free((EPGEvent *)tmp->data);
                 list = g_list_delete_link(list, tmp);
             }
@@ -321,6 +325,9 @@ static gboolean _ui_epg_list_update_events_idle(struct _ui_epg_list_update_data 
                 EPG_ROW_DURATION, ev->duration,
                 EPG_ROW_STARTTIME_STRING, starttime_str,
                 EPG_ROW_DURATION_STRING, duration_str,
+                EPG_ROW_RUNNING_STATUS, ev->running_status,
+                EPG_ROW_WEIGHT, ev->running_status & EPGEventStatusRunning ? PANGO_WEIGHT_BOLD : PANGO_WEIGHT_NORMAL,
+                EPG_ROW_WEIGHT_SET, (gboolean)(ev->running_status & EPGEventStatusRunning),
                 -1);
     }
 
