@@ -180,7 +180,11 @@ static void _ui_scheduled_events_dialog_context_popup_menu(UiScheduledEventsDial
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
 
     gtk_widget_show_all(menu);
+#if GTK_CHECK_VERSION(3,22,0)
+    gtk_menu_popup_at_pointer(GTK_MENU(menu), (GdkEvent *)event);
+#else
     gtk_menu_popup(GTK_MENU(menu), NULL, NULL, NULL, NULL, event->button, event->time);
+#endif
 }
 
 static gboolean _ui_scheduled_events_dialog_list_button_press(UiScheduledEventsDialog *self,
