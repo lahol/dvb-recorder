@@ -25,6 +25,7 @@ void status_save_recorder_data(GKeyFile *kf, RecorderStatus *status)
     g_key_file_set_double(kf, "Recorder", "volume", status->volume);
     g_key_file_set_boolean(kf, "Recorder", "mute", status->mute);
     g_key_file_set_boolean(kf, "Recorder", "running", status->running);
+    g_key_file_set_boolean(kf, "Recorder", "show-clock", status->show_clock);
 }
 
 void status_save(AppStatus *status, gchar *filename)
@@ -82,6 +83,7 @@ void status_restore_recorder_data(GKeyFile *kf, RecorderStatus *status)
     status->volume = g_key_file_get_double(kf, "Recorder", "volume", NULL);
     status->mute = g_key_file_get_boolean(kf, "Recorder", "mute", NULL);
     status->running = g_key_file_get_boolean(kf, "Recorder", "running", NULL);
+    status->show_clock = g_key_file_get_boolean(kf, "Recorder", "show-clock", NULL);
 
     status->initialized = 1;
 }

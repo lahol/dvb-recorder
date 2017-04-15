@@ -29,6 +29,7 @@ typedef struct {
     guint32 mute : 1;
     guint32 running : 1;
     guint32 initialized : 1;
+    guint32 show_clock : 1;
 } RecorderStatus;
 
 typedef struct {

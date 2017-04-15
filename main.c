@@ -43,6 +43,8 @@ struct {
         gulong volume_changed_signal;
         GtkWidget *mute;
         GtkWidget *refresh;
+        GtkWidget *show_clock;
+        gulong clock_toggled_signal;
     } buttons;
 
     GtkWidget *status_label;
@@ -302,6 +304,27 @@ void main_action_record(void)
     }
 }
 
+void main_action_set_show_clock(gboolean show)
+{
+    appstatus.recorder.show_clock = show;
+
+    g_signal_handler_block(widgets.buttons.show_clock, widgets.buttons.clock_toggled_signal);
+    if (show) {
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widgets.buttons.show_clock), TRUE);
+        if (!appdata.record_status_update_source)
+            appdata.record_status_update_source = g_timeout_add_seconds(1, main_update_record_status, NULL);
+    }
+    else {
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widgets.buttons.show_clock), FALSE);
+    }
+    g_signal_handler_unblock(widgets.buttons.show_clock, widgets.buttons.clock_toggled_signal);
+}
+
+void main_action_toggle_clock(void)
+{
+    main_action_set_show_clock(!appstatus.recorder.show_clock);
+}
+
 void main_action_set_mute(gboolean mute)
 {
     appstatus.recorder.mute = mute;
@@ -485,7 +508,15 @@ gboolean main_update_record_status(gpointer userdata)
     dvb_recorder_query_record_status(appdata.recorder, &recstatus);
     gchar tbuf[256];
     gchar *markup;
-    util_duration_to_string_iso(tbuf, 256, recstatus.elapsed_time);
+
+    if (recstatus.status == DVB_RECORD_STATUS_RECORDING || !appstatus.recorder.show_clock) {
+        util_duration_to_string_iso(tbuf, 256, recstatus.elapsed_time);
+    }
+    else {
+        time_t t = time(NULL);
+        struct tm *tm = localtime(&t);
+        strftime(tbuf, 256, "%H:%M:%S", tm);
+    }
 
     if (recstatus.status == DVB_RECORD_STATUS_RECORDING) {
         if (G_UNLIKELY(appdata.rec_status_format_recording == NULL)) {
@@ -549,9 +580,9 @@ gboolean main_update_record_status(gpointer userdata)
         g_free(markup);
     }
 
-    if (recstatus.status != DVB_RECORD_STATUS_RECORDING)
+    if (recstatus.status != DVB_RECORD_STATUS_RECORDING && !appstatus.recorder.show_clock)
         appdata.record_status_update_source = 0;
-    return (gboolean)(recstatus.status == DVB_RECORD_STATUS_RECORDING);
+    return (gboolean)(recstatus.status == DVB_RECORD_STATUS_RECORDING || appstatus.recorder.show_clock);
 }
 
 void main_menu_show_favourites_dialog(void)
@@ -746,6 +777,12 @@ GtkWidget *main_init_channels_dialog_buttons(void)
         g_signal_connect_swapped(G_OBJECT(widgets.buttons.record), "toggled",
             G_CALLBACK(main_action_record), NULL);
     gtk_box_pack_start(GTK_BOX(hbox), widgets.buttons.record, FALSE, FALSE, 0);
+
+    widgets.buttons.show_clock = gtk_toggle_button_new_with_label(_("Show Clock"));
+    widgets.buttons.clock_toggled_signal =
+        g_signal_connect_swapped(G_OBJECT(widgets.buttons.show_clock), "toggled",
+                G_CALLBACK(main_action_toggle_clock), NULL);
+    gtk_box_pack_start(GTK_BOX(hbox), widgets.buttons.show_clock, FALSE, FALSE, 0);
 
     widgets.buttons.snapshot = gtk_button_new();
     gtk_widget_set_tooltip_text(widgets.buttons.snapshot, _("Make snapshot"));
@@ -1020,7 +1057,8 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
             switch (((DVBRecorderEventRecordStatusChanged *)event)->status) {
                 case DVB_RECORD_STATUS_RECORDING:
                     appdata.is_recording = 1;
-                    appdata.record_status_update_source = g_timeout_add_seconds(1, main_update_record_status, NULL);
+                    if (!appdata.record_status_update_source)
+                        appdata.record_status_update_source = g_timeout_add_seconds(1, main_update_record_status, NULL);
                     break;
                 default:
                     if (appdata.is_recording) {
@@ -1103,6 +1141,7 @@ void main_init_actions(void)
 {
     cmd_action_register("toggle_fullscreen", (CmdCallbackProc)main_toggle_fullscreen, NULL);
     cmd_action_register("toggle_record", (CmdCallbackProc)main_action_record, NULL);
+    cmd_action_register("toggle_clock", (CmdCallbackProc)main_action_toggle_clock, NULL);
     cmd_action_register("snapshot", (CmdCallbackProc)main_action_snapshot, NULL);
     cmd_action_register("toggle_mute", (CmdCallbackProc)main_action_toggle_mute, NULL);
     cmd_action_register("quit", (CmdCallbackProc)main_action_quit, NULL);
@@ -1242,6 +1281,7 @@ int main(int argc, char **argv)
         appstatus.recorder.running = 0;
         appstatus.recorder.channel_id = 0;
         appstatus.recorder.mute = 0;
+        appstatus.recorder.show_clock = 0;
 
         main_action_set_volume(1.0);
     }
@@ -1256,6 +1296,8 @@ int main(int argc, char **argv)
             dvb_recorder_set_channel(appdata.recorder, (guint64)appstatus.recorder.channel_id);
         else
             appstatus.recorder.running = 0;
+
+        main_action_set_show_clock(appstatus.recorder.show_clock);
 
         ui_sidebar_channels_set_current_list(UI_SIDEBAR_CHANNELS(widgets.channel_list), appstatus.recorder.fav_list_id);
         ui_sidebar_channels_set_current_signal_source(UI_SIDEBAR_CHANNELS(widgets.channel_list), appstatus.recorder.signal_source);
@@ -1292,6 +1334,8 @@ int main(int argc, char **argv)
 
     if (appdata.hide_cursor_timer)
         g_timer_destroy(appdata.hide_cursor_timer);
+    if (appdata.record_status_update_source)
+        g_source_remove(appdata.record_status_update_source);
     if (appdata.hide_cursor_source)
         g_source_remove(appdata.hide_cursor_source);
     if (appdata.blank_cursor)
