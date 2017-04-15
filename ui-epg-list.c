@@ -370,6 +370,8 @@ struct TraverseTreeData {
     GtkListStore *store;
     GList *remove_list;
     EPGListStoreItem *running;
+    EPGEvent *running_event;
+    gint64 current_time;
 };
 
 static gboolean _ui_epg_list_update_events_traverse_tree(gpointer key, EPGListStoreItem *item, struct TraverseTreeData *data)
@@ -396,8 +398,12 @@ static gboolean _ui_epg_list_update_events_traverse_tree(gpointer key, EPGListSt
                 EPG_ROW_WEIGHT_SET, (gboolean)(item->event->running_status & EPGEventStatusRunning),
                 -1);
 
-        if (item->event->running_status & EPGEventStatusRunning)
+        if ((item->event->running_status & EPGEventStatusRunning) ||
+                (!data->running && data->current_time >= item->event->starttime
+                 && data->current_time <= item->event->starttime + item->event->duration)) {
             data->running = item;
+            data->running_event = item->event;
+        }
 
         item->item_new = 0;
         item->event = NULL;
@@ -406,6 +412,7 @@ static gboolean _ui_epg_list_update_events_traverse_tree(gpointer key, EPGListSt
         data->remove_list = g_list_prepend(data->remove_list, GUINT_TO_POINTER(item->event_id));
         gtk_list_store_remove(data->store, &item->iter);
     }
+
     return FALSE;
 }
 
@@ -452,8 +459,12 @@ static gboolean _ui_epg_list_update_events_idle(struct _ui_epg_list_update_data 
         .store = store,
         .remove_list = NULL,
         .running = NULL,
+        .running_event = NULL,
+        .current_time = (gint64)time(NULL),
     };
     g_tree_foreach(data->list->priv->events, (GTraverseFunc)_ui_epg_list_update_events_traverse_tree, &traverse_tree_data);
+    if (traverse_tree_data.running_event)
+        traverse_tree_data.running_event->running_status |= EPGEventStatusRunning;
 
     /* remove items from tree */
     for (tmp = traverse_tree_data.remove_list; tmp; tmp = g_list_next(tmp)) {
