@@ -21,6 +21,9 @@ struct _UiEpgListPrivate {
     GtkWidget *details_page;
     GtkWidget *details_widget;
 
+/*    guint adjust_signal;*/
+    guint user_scrolled : 1;
+
     DVBRecorder *recorder;
 
     GTree *events;
@@ -75,8 +78,10 @@ static void ui_epg_list_dispose(GObject *gobject)
 {
     UiEpgList *self = UI_EPG_LIST(gobject);
 
-    g_tree_destroy(self->priv->events);
-    self->priv->events = NULL;
+    if (self->priv->events) {
+        g_tree_destroy(self->priv->events);
+        self->priv->events = NULL;
+    }
 
     G_OBJECT_CLASS(ui_epg_list_parent_class)->dispose(gobject);
 }
@@ -202,7 +207,13 @@ static void ui_epg_list_row_activated(UiEpgList *self, GtkTreePath *path, GtkTre
 
 static void ui_epg_list_cursor_changed(UiEpgList *self, GtkTreeView *tv)
 {
-    fprintf(stderr, "CURSOR CHANGED\n");
+    self->priv->user_scrolled = 1;
+}
+
+static gboolean ui_epg_list_scroll_event(UiEpgList *self, GdkEvent *event, GtkWidget *widget)
+{
+    self->priv->user_scrolled = 1;
+    return FALSE;
 }
 
 static void ui_epg_list_details_button_back_clicked(UiEpgList *self)
@@ -250,6 +261,22 @@ static void populate_widget(UiEpgList *self)
 
     g_object_unref(store);
 
+#if 0
+    /* DEBUG */
+    GType type = GTK_TYPE_SCROLLED_WINDOW;
+    guint nids, j;
+    guint *signal_ids;
+    do {
+        signal_ids = g_signal_list_ids(type, &nids);
+        const gchar *type_name = g_type_name(type);
+        for (j = 0; j < nids; ++j) {
+            fprintf(stderr, "signal [%s]: %s\n", type_name, g_signal_name(signal_ids[j]));
+        }
+        g_free(signal_ids);
+    } while ((type = g_type_parent(type)) != 0);
+    /* /DEBUG */
+#endif
+
     g_signal_connect_swapped(G_OBJECT(self->priv->events_list), "row-activated",
             G_CALLBACK(ui_epg_list_row_activated), self);
     g_signal_connect_swapped(G_OBJECT(self->priv->events_list), "cursor-changed",
@@ -262,6 +289,9 @@ static void populate_widget(UiEpgList *self)
     gtk_container_add(GTK_CONTAINER(scroll), self->priv->events_list);
 
     gtk_box_pack_start(GTK_BOX(vbox), scroll, TRUE, TRUE, 0);
+
+    g_signal_connect_swapped(G_OBJECT(scroll), "scroll-event",
+            G_CALLBACK(ui_epg_list_scroll_event), self);
 
     self->priv->stack = gtk_stack_new();
     fprintf(stderr, "transition type: %d\n", gtk_stack_get_transition_type(GTK_STACK(self->priv->stack)));
@@ -339,6 +369,7 @@ GList *_epg_list_remove_duplicates(GList *list)
 struct TraverseTreeData {
     GtkListStore *store;
     GList *remove_list;
+    EPGListStoreItem *running;
 };
 
 static gboolean _ui_epg_list_update_events_traverse_tree(gpointer key, EPGListStoreItem *item, struct TraverseTreeData *data)
@@ -364,6 +395,10 @@ static gboolean _ui_epg_list_update_events_traverse_tree(gpointer key, EPGListSt
                 EPG_ROW_WEIGHT, item->event->running_status & EPGEventStatusRunning ? PANGO_WEIGHT_BOLD : PANGO_WEIGHT_NORMAL,
                 EPG_ROW_WEIGHT_SET, (gboolean)(item->event->running_status & EPGEventStatusRunning),
                 -1);
+
+        if (item->event->running_status & EPGEventStatusRunning)
+            data->running = item;
+
         item->item_new = 0;
         item->event = NULL;
     }
@@ -387,6 +422,10 @@ static gboolean _ui_epg_list_update_events_idle(struct _ui_epg_list_update_data 
                                                    NULL,
                                                    g_free);
     }
+
+/*    GObject *adjustment = G_OBJECT(gtk_scrollable_get_vadjustment(GTK_SCROLLABLE(data->list->priv->events_list)));
+    g_signal_handler_block(adjustment, data->list->priv->adjust_signal);*/
+
     /* For each item in the list check if it was in the store before, else insert it. */
     GList *tmp;
     EPGListStoreItem *item;
@@ -412,6 +451,7 @@ static gboolean _ui_epg_list_update_events_idle(struct _ui_epg_list_update_data 
     struct TraverseTreeData traverse_tree_data = {
         .store = store,
         .remove_list = NULL,
+        .running = NULL,
     };
     g_tree_foreach(data->list->priv->events, (GTraverseFunc)_ui_epg_list_update_events_traverse_tree, &traverse_tree_data);
 
@@ -423,6 +463,22 @@ static gboolean _ui_epg_list_update_events_idle(struct _ui_epg_list_update_data 
 
     /* FIXME: clear events data (or keep until next update?) */
     g_list_free_full(data->events, (GDestroyNotify)epg_event_free);
+
+    if (!data->list->priv->user_scrolled && traverse_tree_data.running) {
+        GtkTreePath *path = gtk_tree_model_get_path(GTK_TREE_MODEL(store), &traverse_tree_data.running->iter);
+        if (path) {
+            gtk_tree_view_scroll_to_cell(GTK_TREE_VIEW(data->list->priv->events_list),
+                                         path,
+                                         NULL,
+                                         TRUE,
+                                         0.1,
+                                         0.0);
+            gtk_tree_path_free(path);
+        }
+    }
+
+/*    g_signal_handler_unblock(adjustment, data->list->priv->adjust_signal);*/
+
     g_free(data);
 
     return FALSE;
@@ -439,12 +495,19 @@ void ui_epg_list_update_events(UiEpgList *list, GList *events)
 
 static gboolean _ui_epg_list_reset_list_idle(UiEpgList *list)
 {
+/*    GObject *adjustment = G_OBJECT(gtk_scrollable_get_vadjustment(GTK_SCROLLABLE(list->priv->events_list)));
+    g_signal_handler_block(adjustment, list->priv->adjust_signal);*/
     GtkListStore *store = GTK_LIST_STORE(gtk_tree_view_get_model(GTK_TREE_VIEW(list->priv->events_list)));
     gtk_list_store_clear(GTK_LIST_STORE(store));
 
-    g_tree_destroy(list->priv->events);
-    list->priv->events = NULL;
+    list->priv->user_scrolled = 0;
 
+    if (list->priv->events) {
+        g_tree_destroy(list->priv->events);
+        list->priv->events = NULL;
+    }
+
+/*    g_signal_handler_unblock(adjustment, list->priv->adjust_signal);*/
     return FALSE;
 }
 
