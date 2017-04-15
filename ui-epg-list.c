@@ -51,6 +51,15 @@ static gint _ui_epg_list_tree_compare_event_id(gpointer key_a, gpointer key_b)
     return (gint)(GPOINTER_TO_INT(key_a) - GPOINTER_TO_INT(key_b));
 }
 
+static gint _ui_epg_list_compare_item_time(GtkTreeModel *store, GtkTreeIter *a, GtkTreeIter *b, gpointer userdata)
+{
+    gint64 start_a, start_b;
+    gtk_tree_model_get(store, a, EPG_ROW_STARTTIME, &start_a, -1);
+    gtk_tree_model_get(store, b, EPG_ROW_STARTTIME, &start_b, -1);
+
+    return (gint)(start_a - start_b);
+}
+
 static gboolean ui_epg_list_key_release_event(GtkWidget *self, GdkEventKey *event)
 {
     g_return_val_if_fail(IS_UI_EPG_LIST(self), FALSE);
@@ -233,8 +242,12 @@ static void populate_widget(UiEpgList *self)
                                G_TYPE_UINT,     /* running status */
                                G_TYPE_INT,
                                G_TYPE_BOOLEAN);  /* style */
-
     gtk_tree_view_set_model(GTK_TREE_VIEW(self->priv->events_list), GTK_TREE_MODEL(store));
+    gtk_tree_sortable_set_sort_func(GTK_TREE_SORTABLE(store), EPG_ROW_STARTTIME,
+                                    (GtkTreeIterCompareFunc)_ui_epg_list_compare_item_time,
+                                    NULL, NULL);
+    gtk_tree_sortable_set_sort_column_id(GTK_TREE_SORTABLE(store), EPG_ROW_STARTTIME, GTK_SORT_ASCENDING);
+
     g_object_unref(store);
 
     g_signal_connect_swapped(G_OBJECT(self->priv->events_list), "row-activated",
