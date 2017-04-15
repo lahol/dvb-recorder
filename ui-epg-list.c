@@ -4,6 +4,14 @@
 #include "ui-epg-event-detail.h"
 #include "utils.h"
 
+typedef struct {
+    GtkTreeIter iter;
+    gint64 starttime;
+    EPGEvent *event;
+    guint16 event_id;
+    guint item_new : 1;
+} EPGListStoreItem;
+
 struct _UiEpgListPrivate {
     /* private data */
     GtkWidget *events_list;
@@ -14,6 +22,8 @@ struct _UiEpgListPrivate {
     GtkWidget *details_widget;
 
     DVBRecorder *recorder;
+
+    GTree *events;
 };
 
 G_DEFINE_TYPE(UiEpgList, ui_epg_list, GTK_TYPE_BIN);
@@ -36,6 +46,11 @@ enum {
     EPG_N_ROWS
 };
 
+static gint _ui_epg_list_tree_compare_event_id(gpointer key_a, gpointer key_b)
+{
+    return (gint)(GPOINTER_TO_INT(key_a) - GPOINTER_TO_INT(key_b));
+}
+
 static gboolean ui_epg_list_key_release_event(GtkWidget *self, GdkEventKey *event)
 {
     g_return_val_if_fail(IS_UI_EPG_LIST(self), FALSE);
@@ -49,7 +64,10 @@ static gboolean ui_epg_list_key_release_event(GtkWidget *self, GdkEventKey *even
 
 static void ui_epg_list_dispose(GObject *gobject)
 {
-    /*UiEpgList *self = UI_EPG_LIST(gobject);*/
+    UiEpgList *self = UI_EPG_LIST(gobject);
+
+    g_tree_destroy(self->priv->events);
+    self->priv->events = NULL;
 
     G_OBJECT_CLASS(ui_epg_list_parent_class)->dispose(gobject);
 }
@@ -173,6 +191,11 @@ static void ui_epg_list_row_activated(UiEpgList *self, GtkTreePath *path, GtkTre
     gtk_stack_set_visible_child(GTK_STACK(self->priv->stack), self->priv->details_page);
 }
 
+static void ui_epg_list_cursor_changed(UiEpgList *self, GtkTreeView *tv)
+{
+    fprintf(stderr, "CURSOR CHANGED\n");
+}
+
 static void ui_epg_list_details_button_back_clicked(UiEpgList *self)
 {
     g_return_if_fail(IS_UI_EPG_LIST(self));
@@ -216,6 +239,8 @@ static void populate_widget(UiEpgList *self)
 
     g_signal_connect_swapped(G_OBJECT(self->priv->events_list), "row-activated",
             G_CALLBACK(ui_epg_list_row_activated), self);
+    g_signal_connect_swapped(G_OBJECT(self->priv->events_list), "cursor-changed",
+            G_CALLBACK(ui_epg_list_cursor_changed), self);
 
     GtkWidget *scroll = gtk_scrolled_window_new(NULL, NULL);
     gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
@@ -298,38 +323,90 @@ GList *_epg_list_remove_duplicates(GList *list)
     return list;
 }
 
-static gboolean _ui_epg_list_update_events_idle(struct _ui_epg_list_update_data *data)
+struct TraverseTreeData {
+    GtkListStore *store;
+    GList *remove_list;
+};
+
+static gboolean _ui_epg_list_update_events_traverse_tree(gpointer key, EPGListStoreItem *item, struct TraverseTreeData *data)
 {
-    GtkListStore *store = GTK_LIST_STORE(gtk_tree_view_get_model(GTK_TREE_VIEW(data->list->priv->events_list)));
-    GtkTreeIter iter;
-    EPGEvent *ev;
-    EPGShortEvent *sev;
     gchar starttime_str[256];
     gchar duration_str[256];
 
-    gtk_list_store_clear(GTK_LIST_STORE(store));
+    if (item->event) {
+        EPGShortEvent *sev = (EPGShortEvent *)(item->event->short_descriptions ? item->event->short_descriptions->data : NULL);
+        if (item->item_new) {
+            gtk_list_store_append(data->store, &item->iter);
+        }
+        util_time_to_string(starttime_str, 256, item->event->starttime, TRUE);
+        util_duration_to_string(duration_str, 256, item->event->duration);
+        gtk_list_store_set(data->store, &item->iter,
+                EPG_ROW_TITLE, sev ? sev->description : "<i>no description</i>",
+                EPG_ROW_ID, item->event->event_id,
+                EPG_ROW_STARTTIME, (gint64)item->event->starttime,
+                EPG_ROW_DURATION, item->event->duration,
+                EPG_ROW_STARTTIME_STRING, starttime_str,
+                EPG_ROW_DURATION_STRING, duration_str,
+                EPG_ROW_RUNNING_STATUS, item->event->running_status,
+                EPG_ROW_WEIGHT, item->event->running_status & EPGEventStatusRunning ? PANGO_WEIGHT_BOLD : PANGO_WEIGHT_NORMAL,
+                EPG_ROW_WEIGHT_SET, (gboolean)(item->event->running_status & EPGEventStatusRunning),
+                -1);
+        item->item_new = 0;
+        item->event = NULL;
+    }
+    else {
+        data->remove_list = g_list_prepend(data->remove_list, GUINT_TO_POINTER(item->event_id));
+        gtk_list_store_remove(data->store, &item->iter);
+    }
+    return FALSE;
+}
+
+static gboolean _ui_epg_list_update_events_idle(struct _ui_epg_list_update_data *data)
+{
+    GtkListStore *store = GTK_LIST_STORE(gtk_tree_view_get_model(GTK_TREE_VIEW(data->list->priv->events_list)));
+    EPGEvent *ev;
 
     data->events = _epg_list_remove_duplicates(data->events);
 
-    for ( ; data->events; data->events = g_list_next(data->events)) {
-        ev = (EPGEvent *)data->events->data;
-        /* list head */
-        sev = (EPGShortEvent *)(ev->short_descriptions ? ev->short_descriptions->data : NULL);
-        util_time_to_string(starttime_str, 256, ev->starttime, TRUE);
-        util_duration_to_string(duration_str, 256, ev->duration);
-        gtk_list_store_append(store, &iter);
-        gtk_list_store_set(store, &iter,
-                EPG_ROW_TITLE, sev ? sev->description : "<i>no description</i>",
-                EPG_ROW_ID, ev->event_id,
-                EPG_ROW_STARTTIME, (gint64)ev->starttime,
-                EPG_ROW_DURATION, ev->duration,
-                EPG_ROW_STARTTIME_STRING, starttime_str,
-                EPG_ROW_DURATION_STRING, duration_str,
-                EPG_ROW_RUNNING_STATUS, ev->running_status,
-                EPG_ROW_WEIGHT, ev->running_status & EPGEventStatusRunning ? PANGO_WEIGHT_BOLD : PANGO_WEIGHT_NORMAL,
-                EPG_ROW_WEIGHT_SET, (gboolean)(ev->running_status & EPGEventStatusRunning),
-                -1);
+    if (!data->list->priv->events) {
+        data->list->priv->events = g_tree_new_full((GCompareDataFunc)_ui_epg_list_tree_compare_event_id,
+                                                   NULL,
+                                                   NULL,
+                                                   g_free);
     }
+    /* For each item in the list check if it was in the store before, else insert it. */
+    GList *tmp;
+    EPGListStoreItem *item;
+    for (tmp = data->events; tmp; tmp = g_list_next(tmp)) {
+        ev = (EPGEvent *)tmp->data;
+        item = g_tree_lookup(data->list->priv->events, GUINT_TO_POINTER(ev->event_id));
+        if (item) {
+            item->event = ev;
+            item->starttime = (gint64)ev->starttime;
+        }
+        else {
+            item = g_malloc(sizeof(EPGListStoreItem));
+            item->event = ev;
+            item->event_id = ev->event_id;
+            item->item_new = 1;
+            item->starttime = ev->starttime;
+            g_tree_insert(data->list->priv->events, GUINT_TO_POINTER(ev->event_id), item);
+        }
+    }
+
+    /* For each element in the tree check if it is still there, then update it. If it is new append, if pointer
+     * is not set, it is not present anymore and we remove it. */
+    struct TraverseTreeData traverse_tree_data = {
+        .store = store,
+        .remove_list = NULL,
+    };
+    g_tree_foreach(data->list->priv->events, (GTraverseFunc)_ui_epg_list_update_events_traverse_tree, &traverse_tree_data);
+
+    /* remove items from tree */
+    for (tmp = traverse_tree_data.remove_list; tmp; tmp = g_list_next(tmp)) {
+        g_tree_remove(data->list->priv->events, tmp->data);
+    }
+    g_list_free(traverse_tree_data.remove_list);
 
     /* FIXME: clear events data (or keep until next update?) */
     g_list_free_full(data->events, (GDestroyNotify)epg_event_free);
@@ -345,6 +422,22 @@ void ui_epg_list_update_events(UiEpgList *list, GList *events)
     data->events = epg_event_list_dup(events);
 
     gdk_threads_add_idle((GSourceFunc)_ui_epg_list_update_events_idle, data);
+}
+
+static gboolean _ui_epg_list_reset_list_idle(UiEpgList *list)
+{
+    GtkListStore *store = GTK_LIST_STORE(gtk_tree_view_get_model(GTK_TREE_VIEW(list->priv->events_list)));
+    gtk_list_store_clear(GTK_LIST_STORE(store));
+
+    g_tree_destroy(list->priv->events);
+    list->priv->events = NULL;
+
+    return FALSE;
+}
+
+void ui_epg_list_reset_events(UiEpgList *list)
+{
+    gdk_threads_add_idle((GSourceFunc)_ui_epg_list_reset_list_idle, list);
 }
 
 void ui_epg_list_set_recorder_handle(UiEpgList *list, DVBRecorder *handle)

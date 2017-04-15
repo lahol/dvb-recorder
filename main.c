@@ -59,6 +59,7 @@ struct {
     guint32 is_sdt_ready : 1;
     guint32 notified_channel_change : 1;
     guint32 ignore_events : 1;
+    guint32 epg_valid : 1;
 
     CmdMode command_mode;
 
@@ -1040,6 +1041,7 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
                     LOG("dvb-recorder: tuned in\n");
                     video_output_set_infile(appdata.video_output,
                                             dvb_recorder_enable_video_source(appdata.recorder, TRUE));
+                    ui_epg_list_reset_events(UI_EPG_LIST(widgets.epg_list));
                     break;
                 case DVB_STREAM_STATUS_TUNE_FAILED:
                     LOG("dvb-recorder: tune failed\n");
