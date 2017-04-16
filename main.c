@@ -308,11 +308,16 @@ void main_action_set_show_clock(gboolean show)
 {
     appstatus.recorder.show_clock = show;
 
+    /* Use another format string */
+    g_free(appdata.rec_status_format_normal);
+    appdata.rec_status_format_normal = NULL;
+
     g_signal_handler_block(widgets.buttons.show_clock, widgets.buttons.clock_toggled_signal);
     if (show) {
         gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widgets.buttons.show_clock), TRUE);
         if (!appdata.record_status_update_source)
             appdata.record_status_update_source = g_timeout_add_seconds(1, main_update_record_status, NULL);
+        main_update_record_status(NULL);
     }
     else {
         gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widgets.buttons.show_clock), FALSE);
@@ -552,21 +557,44 @@ gboolean main_update_record_status(gpointer userdata)
             gchar *color = NULL;
             gchar *font_format;
             gchar *color_format;
-            if (config_get("main", "record-status-font", CFG_TYPE_STRING, &font) != 0) {
-                font_format = g_strdup("size=\"48000\"");
-            }
-            else {
-                font_format = g_strdup_printf("font=\"%s\"", font);
-                g_free(font);
-            }
-            if (config_get("main", "record-status-color-normal", CFG_TYPE_STRING, &color) != 0) {
-                color_format = g_strdup("color=\"black\"");
-            }
-            else {
-                color_format = g_strdup_printf("color=\"%s\"", color);
-                g_free(color);
-            }
 
+            if (appstatus.recorder.show_clock) {
+                /* Use record-status-font/color as first fallback */
+                if (config_get("main", "clock-font", CFG_TYPE_STRING, &font) != 0 /*&&
+                    config_get("main", "record-status-font", CFG_TYPE_STRING, &font) != 0*/) {
+                    font_format = g_strdup("size=\"48000\"");
+                }
+                else {
+                    font_format = g_strdup_printf("font=\"%s\"", font);
+                    g_free(font);
+                }
+                if (config_get("main", "clock-color", CFG_TYPE_STRING, &color) != 0 /*&&
+                    config_get("main", "record-status-color-normal", CFG_TYPE_STRING, &color) != 0*/) {
+                    color_format = g_strdup("color=\"black\"");
+                }
+                else {
+                    color_format = g_strdup_printf("color=\"%s\"", color);
+                    g_free(color);
+                }
+            }
+            else {
+                if (config_get("main", "record-status-font", CFG_TYPE_STRING, &font) != 0 /*&&
+                    config_get("main", "clock-font", CFG_TYPE_STRING, &font) != 0*/) {
+                    font_format = g_strdup("size=\"48000\"");
+                }
+                else {
+                    font_format = g_strdup_printf("font=\"%s\"", font);
+                    g_free(font);
+                }
+                if (config_get("main", "record-status-color-normal", CFG_TYPE_STRING, &color) != 0 /*&&
+                    config_get("main", "clock-color", CFG_TYPE_STRING, &color) != 0*/) {
+                    color_format = g_strdup("color=\"black\"");
+                }
+                else {
+                    color_format = g_strdup_printf("color=\"%s\"", color);
+                    g_free(color);
+                }
+            }
             appdata.rec_status_format_normal = g_strdup_printf("<span %s %s>%%s</span>",
                                                         font_format, color_format);
             g_free(font_format);
@@ -1340,10 +1368,8 @@ int main(int argc, char **argv)
         g_source_remove(appdata.hide_cursor_source);
     if (appdata.blank_cursor)
         g_object_unref(G_OBJECT(appdata.blank_cursor));
-    if (appdata.rec_status_format_normal)
-        g_free(appdata.rec_status_format_normal);
-    if (appdata.rec_status_format_recording)
-        g_free(appdata.rec_status_format_recording);
+    g_free(appdata.rec_status_format_normal);
+    g_free(appdata.rec_status_format_recording);
 
 
     LOG("done\n");
