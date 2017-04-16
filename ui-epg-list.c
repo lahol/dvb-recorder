@@ -463,8 +463,13 @@ static gboolean _ui_epg_list_update_events_idle(struct _ui_epg_list_update_data 
         .current_time = (gint64)time(NULL),
     };
     g_tree_foreach(data->list->priv->events, (GTraverseFunc)_ui_epg_list_update_events_traverse_tree, &traverse_tree_data);
-    if (traverse_tree_data.running_event)
-        traverse_tree_data.running_event->running_status |= EPGEventStatusRunning;
+    if (traverse_tree_data.running_event && !(traverse_tree_data.running_event->running_status & EPGEventStatusRunning)) {
+        gtk_list_store_set(store, &traverse_tree_data.running->iter,
+                EPG_ROW_RUNNING_STATUS, traverse_tree_data.running_event->running_status | EPGEventStatusRunning,
+                EPG_ROW_WEIGHT, PANGO_WEIGHT_BOLD,
+                EPG_ROW_WEIGHT_SET, TRUE,
+                -1);
+    }
 
     /* remove items from tree */
     for (tmp = traverse_tree_data.remove_list; tmp; tmp = g_list_next(tmp)) {
