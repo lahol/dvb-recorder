@@ -13,14 +13,10 @@ G_BEGIN_DECLS
 #define UI_RECORDER_SETTINGS_DIALOG_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), UI_RECORDER_SETTINGS_DIALOG_TYPE, UiRecorderSettingsDialogClass))
 
 typedef struct _UiRecorderSettingsDialog UiRecorderSettingsDialog;
-typedef struct _UiRecorderSettingsDialogPrivate UiRecorderSettingsDialogPrivate;
 typedef struct _UiRecorderSettingsDialogClass UiRecorderSettingsDialogClass;
 
 struct _UiRecorderSettingsDialog {
     GtkDialog parent_instance;
-
-    /*< private >*/
-    UiRecorderSettingsDialogPrivate *priv;
 };
 
 struct _UiRecorderSettingsDialogClass {
