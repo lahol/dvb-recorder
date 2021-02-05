@@ -13,14 +13,10 @@ G_BEGIN_DECLS
 #define VIDEO_SETTINGS_DIALOG_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), VIDEO_SETTINGS_DIALOG_TYPE, VideoSettingsDialogClass))
 
 typedef struct _VideoSettingsDialog VideoSettingsDialog;
-typedef struct _VideoSettingsDialogPrivate VideoSettingsDialogPrivate;
 typedef struct _VideoSettingsDialogClass VideoSettingsDialogClass;
 
 struct _VideoSettingsDialog {
     GtkDialog parent_instance;
-
-    /*< private >*/
-    VideoSettingsDialogPrivate *priv;
 };
 
 struct _VideoSettingsDialogClass {

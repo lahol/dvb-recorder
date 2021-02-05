@@ -4,7 +4,7 @@
 #include "video-output.h"
 #include "config.h"
 
-struct _VideoSettingsDialogPrivate {
+typedef struct _VideoSettingsDialogPrivate {
     /* private data */
     GtkWindow *parent;
 
@@ -24,9 +24,9 @@ struct _VideoSettingsDialogPrivate {
     gint contrast;
     gint hue;
     gint saturation;
-};
+} VideoSettingsDialogPrivate;
 
-G_DEFINE_TYPE(VideoSettingsDialog, video_settings_dialog, GTK_TYPE_DIALOG);
+G_DEFINE_TYPE_WITH_PRIVATE(VideoSettingsDialog, video_settings_dialog, GTK_TYPE_DIALOG);
 
 enum {
     PROP_0,
@@ -53,17 +53,18 @@ static void video_settings_dialog_finalize(GObject *gobject)
     G_OBJECT_CLASS(video_settings_dialog_parent_class)->finalize(gobject);
 }
 
-static void video_settings_dialog_set_property(GObject *object, guint prop_id, 
+static void video_settings_dialog_set_property(GObject *object, guint prop_id,
         const GValue *value, GParamSpec *spec)
 {
     VideoSettingsDialog *self = VIDEO_SETTINGS_DIALOG(object);
+    VideoSettingsDialogPrivate *priv = video_settings_dialog_get_instance_private(self);
 
     switch (prop_id) {
         case PROP_PARENT:
             video_settings_dialog_set_parent(self, GTK_WINDOW(g_value_get_object(value)));
             break;
         case PROP_VIDEO_OUTPUT:
-            self->priv->vo = g_value_get_pointer(value);
+            priv->vo = g_value_get_pointer(value);
             break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, spec);
@@ -75,22 +76,23 @@ static void video_settings_dialog_get_property(GObject *object, guint prop_id,
         GValue *value, GParamSpec *spec)
 {
     VideoSettingsDialog *self = VIDEO_SETTINGS_DIALOG(object);
+    VideoSettingsDialogPrivate *priv = video_settings_dialog_get_instance_private(self);
 
     switch (prop_id) {
         case PROP_PARENT:
-            g_value_set_object(value, self->priv->parent);
+            g_value_set_object(value, priv->parent);
             break;
         case PROP_BRIGHTNESS:
-            g_value_set_int(value, self->priv->brightness);
+            g_value_set_int(value, priv->brightness);
             break;
         case PROP_CONTRAST:
-            g_value_set_int(value, self->priv->contrast);
+            g_value_set_int(value, priv->contrast);
             break;
         case PROP_HUE:
-            g_value_set_int(value, self->priv->hue);
+            g_value_set_int(value, priv->hue);
             break;
         case PROP_SATURATION:
-            g_value_set_int(value, self->priv->saturation);
+            g_value_set_int(value, priv->saturation);
             break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, spec);
@@ -162,36 +164,38 @@ static void video_settings_dialog_class_init(VideoSettingsDialogClass *klass)
                 1000,
                 0,
                 G_PARAM_READABLE));
-
-    g_type_class_add_private(G_OBJECT_CLASS(klass), sizeof(VideoSettingsDialogPrivate));
 }
 
 static void video_settings_dialog_value_changed_brightness(VideoSettingsDialog *dialog, GtkSpinButton *scale)
 {
-    dialog->priv->brightness = gtk_spin_button_get_value_as_int(scale);
-    if (dialog->priv->vo)
-        video_output_set_brightness(dialog->priv->vo, dialog->priv->brightness);
+    VideoSettingsDialogPrivate *priv = video_settings_dialog_get_instance_private(dialog);
+    priv->brightness = gtk_spin_button_get_value_as_int(scale);
+    if (priv->vo)
+        video_output_set_brightness(priv->vo, priv->brightness);
 }
 
 static void video_settings_dialog_value_changed_contrast(VideoSettingsDialog *dialog, GtkSpinButton *scale)
 {
-    dialog->priv->contrast = gtk_spin_button_get_value_as_int(scale);
-    if (dialog->priv->vo)
-        video_output_set_contrast(dialog->priv->vo, dialog->priv->contrast);
+    VideoSettingsDialogPrivate *priv = video_settings_dialog_get_instance_private(dialog);
+    priv->contrast = gtk_spin_button_get_value_as_int(scale);
+    if (priv->vo)
+        video_output_set_contrast(priv->vo, priv->contrast);
 }
 
 static void video_settings_dialog_value_changed_hue(VideoSettingsDialog *dialog, GtkSpinButton *scale)
 {
-    dialog->priv->hue = gtk_spin_button_get_value_as_int(scale);
-    if (dialog->priv->vo)
-        video_output_set_hue(dialog->priv->vo, dialog->priv->hue);
+    VideoSettingsDialogPrivate *priv = video_settings_dialog_get_instance_private(dialog);
+    priv->hue = gtk_spin_button_get_value_as_int(scale);
+    if (priv->vo)
+        video_output_set_hue(priv->vo, priv->hue);
 }
 
 static void video_settings_dialog_value_changed_saturation(VideoSettingsDialog *dialog, GtkSpinButton *scale)
 {
-    dialog->priv->saturation = gtk_spin_button_get_value_as_int(scale);
-    if (dialog->priv->vo)
-        video_output_set_saturation(dialog->priv->vo, dialog->priv->saturation);
+    VideoSettingsDialogPrivate *priv = video_settings_dialog_get_instance_private(dialog);
+    priv->saturation = gtk_spin_button_get_value_as_int(scale);
+    if (priv->vo)
+        video_output_set_saturation(priv->vo, priv->saturation);
 }
 
 static void populate_widget(VideoSettingsDialog *self)
@@ -200,6 +204,7 @@ static void populate_widget(VideoSettingsDialog *self)
             _("_Apply"), GTK_RESPONSE_APPLY,
             _("_Close"), GTK_RESPONSE_CLOSE,
             NULL);
+    VideoSettingsDialogPrivate *priv = video_settings_dialog_get_instance_private(self);
 
     GtkWidget *content_area = gtk_dialog_get_content_area(GTK_DIALOG(self));
 
@@ -208,38 +213,38 @@ static void populate_widget(VideoSettingsDialog *self)
 
     GtkWidget *label = NULL;
     GtkAdjustment *adjust = NULL;
-    
+
     label = gtk_label_new("Brightness:");
-    adjust = gtk_adjustment_new((gdouble)self->priv->brightness, -1000, 1000, 1.0, 20, 0);
-    self->priv->scale_brightness = gtk_spin_button_new(adjust, 10, 0);
-    g_signal_connect_swapped(G_OBJECT(self->priv->scale_brightness), "value-changed",
+    adjust = gtk_adjustment_new((gdouble)priv->brightness, -1000, 1000, 1.0, 20, 0);
+    priv->scale_brightness = gtk_spin_button_new(adjust, 10, 0);
+    g_signal_connect_swapped(G_OBJECT(priv->scale_brightness), "value-changed",
             G_CALLBACK(video_settings_dialog_value_changed_brightness), self);
     gtk_grid_attach(GTK_GRID(grid), label, 0, 0, 1, 1);
-    gtk_grid_attach(GTK_GRID(grid), self->priv->scale_brightness, 1, 0, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), priv->scale_brightness, 1, 0, 1, 1);
 
     label = gtk_label_new("Contrast:");
-    adjust = gtk_adjustment_new((gdouble)self->priv->contrast, -1000, 1000, 1.0, 20, 0);
-    self->priv->scale_contrast = gtk_spin_button_new(adjust, 10, 0);
-    g_signal_connect_swapped(G_OBJECT(self->priv->scale_contrast), "value-changed",
+    adjust = gtk_adjustment_new((gdouble)priv->contrast, -1000, 1000, 1.0, 20, 0);
+    priv->scale_contrast = gtk_spin_button_new(adjust, 10, 0);
+    g_signal_connect_swapped(G_OBJECT(priv->scale_contrast), "value-changed",
             G_CALLBACK(video_settings_dialog_value_changed_contrast), self);
     gtk_grid_attach(GTK_GRID(grid), label, 0, 1, 1, 1);
-    gtk_grid_attach(GTK_GRID(grid), self->priv->scale_contrast, 1, 1, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), priv->scale_contrast, 1, 1, 1, 1);
 
     label = gtk_label_new("Hue:");
-    adjust = gtk_adjustment_new((gdouble)self->priv->hue, -1000, 1000, 1.0, 20, 0);
-    self->priv->scale_hue = gtk_spin_button_new(adjust, 10, 0);
-    g_signal_connect_swapped(G_OBJECT(self->priv->scale_hue), "value-changed",
+    adjust = gtk_adjustment_new((gdouble)priv->hue, -1000, 1000, 1.0, 20, 0);
+    priv->scale_hue = gtk_spin_button_new(adjust, 10, 0);
+    g_signal_connect_swapped(G_OBJECT(priv->scale_hue), "value-changed",
             G_CALLBACK(video_settings_dialog_value_changed_hue), self);
     gtk_grid_attach(GTK_GRID(grid), label, 0, 2, 1, 1);
-    gtk_grid_attach(GTK_GRID(grid), self->priv->scale_hue, 1, 2, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), priv->scale_hue, 1, 2, 1, 1);
 
     label = gtk_label_new("Saturation:");
-    adjust = gtk_adjustment_new((gdouble)self->priv->saturation, -1000, 1000, 1.0, 20, 0);
-    self->priv->scale_saturation = gtk_spin_button_new(adjust, 10, 0);
-    g_signal_connect_swapped(G_OBJECT(self->priv->scale_saturation), "value-changed",
+    adjust = gtk_adjustment_new((gdouble)priv->saturation, -1000, 1000, 1.0, 20, 0);
+    priv->scale_saturation = gtk_spin_button_new(adjust, 10, 0);
+    g_signal_connect_swapped(G_OBJECT(priv->scale_saturation), "value-changed",
             G_CALLBACK(video_settings_dialog_value_changed_saturation), self);
     gtk_grid_attach(GTK_GRID(grid), label, 0, 3, 1, 1);
-    gtk_grid_attach(GTK_GRID(grid), self->priv->scale_saturation, 1, 3, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), priv->scale_saturation, 1, 3, 1, 1);
 
     gtk_widget_show_all(grid);
 
@@ -248,18 +253,17 @@ static void populate_widget(VideoSettingsDialog *self)
 
 static void video_settings_dialog_init(VideoSettingsDialog *self)
 {
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE(self,
-            VIDEO_SETTINGS_DIALOG_TYPE, VideoSettingsDialogPrivate);
+    VideoSettingsDialogPrivate *priv = video_settings_dialog_get_instance_private(self);
 
 /*    gtk_widget_set_has_window(GTK_WIDGET(self), FALSE);*/
-    if (config_get("video", "brightness", CFG_TYPE_INT, &self->priv->brightness) != 0)
-        self->priv->brightness = 0;
-    if (config_get("video", "contrast", CFG_TYPE_INT, &self->priv->contrast) != 0)
-        self->priv->contrast = 0;
-    if (config_get("video", "hue", CFG_TYPE_INT, &self->priv->hue) != 0)
-        self->priv->hue = 0;
-    if (config_get("video", "saturation", CFG_TYPE_INT, &self->priv->saturation) != 0)
-        self->priv->saturation = 0;
+    if (config_get("video", "brightness", CFG_TYPE_INT, &priv->brightness) != 0)
+        priv->brightness = 0;
+    if (config_get("video", "contrast", CFG_TYPE_INT, &priv->contrast) != 0)
+        priv->contrast = 0;
+    if (config_get("video", "hue", CFG_TYPE_INT, &priv->hue) != 0)
+        priv->hue = 0;
+    if (config_get("video", "saturation", CFG_TYPE_INT, &priv->saturation) != 0)
+        priv->saturation = 0;
 
     populate_widget(self);
 }
@@ -271,7 +275,8 @@ GtkWidget *video_settings_dialog_new(GtkWindow *parent)
 
 void video_settings_dialog_set_parent(VideoSettingsDialog *dialog, GtkWindow *parent)
 {
-    dialog->priv->parent = parent;
+    VideoSettingsDialogPrivate *priv = video_settings_dialog_get_instance_private(dialog);
+    priv->parent = parent;
     gtk_window_set_transient_for(GTK_WINDOW(dialog), GTK_WINDOW(parent));
     gtk_window_set_destroy_with_parent(GTK_WINDOW(dialog), TRUE);
     gtk_window_set_modal(GTK_WINDOW(dialog), TRUE);
