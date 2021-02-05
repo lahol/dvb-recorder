@@ -208,7 +208,7 @@ void osd_update_overlay(OSD *osd)
     }
 
     gboolean dark = FALSE;
-/*    if (sqrt(  0.299*font_color.red*font_color.red 
+/*    if (sqrt(  0.299*font_color.red*font_color.red
              + 0.587*font_color.green*font_color.green
              + 0.114*font_color.blue*font_color.blue) < 0.5)*/
     if (0.299 * font_color.red + 0.587 * font_color.green + 0.114 * font_color.blue < 0.5)

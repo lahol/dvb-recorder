@@ -223,7 +223,7 @@ gchar *main_get_capture_dir(void)
     if (config_get("main", "capture-dir", CFG_TYPE_STRING, &dir) != 0 || dir == NULL || dir[0] == '\0') {
         return g_strdup(g_get_home_dir());
     }
-    
+
     return dir;
 }
 
@@ -234,7 +234,7 @@ gchar *main_get_snapshot_dir(void)
     if (config_get("main", "snapshot-dir", CFG_TYPE_STRING, &dir) != 0 || dir == NULL || dir[0] == '\0') {
         return g_strdup(g_get_home_dir());
     }
-    
+
     return dir;
 }
 
@@ -881,7 +881,7 @@ void main_init_channels_dialog(void)
     gtk_window_add_accel_group(GTK_WINDOW(widgets.channels_dialog), widgets.accelerator_group);
 
     main_position_dialog(widgets.channels_dialog, &appstatus.gui.channels_dialog, 200, 400);
-    
+
     gtk_widget_show_all(widgets.channels_dialog);
 }
 
@@ -900,7 +900,7 @@ void main_init_epg_dialog(void)
     gtk_window_set_title(GTK_WINDOW(widgets.epg_dialog), _("Program information"));
 
     widgets.epg_list = ui_epg_list_new();
-    
+
     gtk_box_pack_start(GTK_BOX(content), widgets.epg_list, TRUE, TRUE, 0);
 
     gtk_window_add_accel_group(GTK_WINDOW(widgets.epg_dialog), widgets.accelerator_group);
@@ -1140,7 +1140,7 @@ void main_recorder_event_callback(DVBRecorderEvent *event, gpointer userdata)
                 LOG("EIT changed\n");
 
                 GList *events = dvb_recorder_get_epg(appdata.recorder);
-                ui_epg_list_update_events(UI_EPG_LIST(widgets.epg_list), events); 
+                ui_epg_list_update_events(UI_EPG_LIST(widgets.epg_list), events);
 
                 LOG("Updated events\n");
 

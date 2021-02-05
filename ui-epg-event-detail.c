@@ -126,8 +126,6 @@ static void populate_widget(UiEpgEventDetail *self)
 
 static void ui_epg_event_detail_init(UiEpgEventDetail *self)
 {
-    UiEpgEventDetailPrivate *priv = ui_epg_event_detail_get_instance_private(self);
-
 /*    gtk_widget_set_has_window(GTK_WIDGET(self), FALSE);*/
 
     populate_widget(self);

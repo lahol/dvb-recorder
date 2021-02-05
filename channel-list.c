@@ -393,8 +393,8 @@ void channel_list_fill_cb(ChannelData *data, ChannelList *channel_list)
            -1);
 
     GQuark source_quark = g_quark_from_string(data->signalsource);
-    if (source_quark && !g_list_find(priv->active_sources, (gpointer)source_quark)) {
-        priv->active_sources = g_list_prepend(priv->active_sources, (gpointer)source_quark);
+    if (source_quark && !g_list_find(priv->active_sources, GUINT_TO_POINTER(source_quark))) {
+        priv->active_sources = g_list_prepend(priv->active_sources, GUINT_TO_POINTER(source_quark));
         /* append to combobox */
         g_signal_handler_block(priv->signal_source_widget, priv->combo_box_changed_signal);
         gtk_list_store_append(priv->signal_source_store, &iter);
