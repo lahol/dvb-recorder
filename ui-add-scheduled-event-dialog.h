@@ -13,14 +13,10 @@ G_BEGIN_DECLS
 #define UI_ADD_SCHEDULED_EVENT_DIALOG_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), UI_ADD_SCHEDULED_EVENT_DIALOG_TYPE, UiAddScheduledEventDialogClass))
 
 typedef struct _UiAddScheduledEventDialog UiAddScheduledEventDialog;
-typedef struct _UiAddScheduledEventDialogPrivate UiAddScheduledEventDialogPrivate;
 typedef struct _UiAddScheduledEventDialogClass UiAddScheduledEventDialogClass;
 
 struct _UiAddScheduledEventDialog {
     GtkDialog parent_instance;
-
-    /*< private >*/
-    UiAddScheduledEventDialogPrivate *priv;
 };
 
 struct _UiAddScheduledEventDialogClass {
