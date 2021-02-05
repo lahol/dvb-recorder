@@ -10,7 +10,7 @@
 
 #include <dvbrecorder/channel-db.h>
 
-struct _UiSidebarChannelsPrivate {
+typedef struct _UiSidebarChannelsPrivate {
     GtkWidget *favourites_list_widget;
     GtkWidget *channel_list;
 
@@ -21,9 +21,9 @@ struct _UiSidebarChannelsPrivate {
     guint32 selected_channel_id;
 
     gulong cursor_changed_signal;
-};
+} UiSidebarChannelsPrivate;
 
-G_DEFINE_TYPE(UiSidebarChannels, ui_sidebar_channels, GTK_TYPE_BIN);
+G_DEFINE_TYPE_WITH_PRIVATE(UiSidebarChannels, ui_sidebar_channels, GTK_TYPE_BIN);
 
 enum {
     PROP_0,
@@ -133,8 +133,6 @@ static void ui_sidebar_channels_class_init(UiSidebarChannelsClass *klass)
                 G_TYPE_UINT,
                 G_TYPE_UINT,
                 NULL);
-
-    g_type_class_add_private(G_OBJECT_CLASS(klass), sizeof(UiSidebarChannelsPrivate));
 }
 
 static void _ui_sidebar_channels_channel_row_activated(UiSidebarChannels *sidebar, GtkTreePath *path, GtkTreeViewColumn *column,
@@ -197,9 +195,10 @@ static void _ui_sidebar_channels_context_popup_menu(UiSidebarChannels *sidebar, 
 static gboolean _ui_sidebar_channels_channel_button_press(UiSidebarChannels *sidebar, GdkEventButton *event,
         GtkTreeView *tree_view)
 {
+    UiSidebarChannelsPrivate *priv = ui_sidebar_channels_get_instance_private(sidebar);
     if (event->button == 3) {
         GtkTreePath *path = NULL;
-        GtkTreeView *tv = channel_list_get_tree_view(CHANNEL_LIST(sidebar->priv->channel_list));
+        GtkTreeView *tv = channel_list_get_tree_view(CHANNEL_LIST(priv->channel_list));
         if (tv && gtk_tree_view_get_path_at_pos(GTK_TREE_VIEW(tv),
                     (gint)event->x, (gint)event->y,
                     &path, NULL, NULL, NULL)) {
@@ -267,16 +266,17 @@ GtkListStore *_ui_sidebar_channels_create_favourites_list_store(void)
 
 void _ui_sidebar_channels_reset_channels_list(UiSidebarChannels *sidebar, GtkListStore *store)
 {
-    GtkTreeView *tv = channel_list_get_tree_view(CHANNEL_LIST(sidebar->priv->channel_list));
-    g_signal_handler_block(tv, sidebar->priv->cursor_changed_signal);
+    UiSidebarChannelsPrivate *priv = ui_sidebar_channels_get_instance_private(sidebar);
+    GtkTreeView *tv = channel_list_get_tree_view(CHANNEL_LIST(priv->channel_list));
+    g_signal_handler_block(tv, priv->cursor_changed_signal);
 
-    channel_list_clear(CHANNEL_LIST(sidebar->priv->channel_list));
+    channel_list_clear(CHANNEL_LIST(priv->channel_list));
 
     guint32 id = ui_sidebar_channels_get_current_list(sidebar);
-   
+
     fprintf(stderr, "reset channels list %u\n", id);
-    channel_db_foreach(id, (CHANNEL_DB_FOREACH_CALLBACK)channel_list_fill_cb, sidebar->priv->channel_list);
-    g_signal_handler_unblock(tv, sidebar->priv->cursor_changed_signal);
+    channel_db_foreach(id, (CHANNEL_DB_FOREACH_CALLBACK)channel_list_fill_cb, priv->channel_list);
+    g_signal_handler_unblock(tv, priv->cursor_changed_signal);
 }
 
 void _ui_sidebar_channels_fill_favourites_cb(ChannelDBList *data, GtkListStore *store)
@@ -293,13 +293,14 @@ void _ui_sidebar_channels_fill_favourites_cb(ChannelDBList *data, GtkListStore *
 static void _ui_sidebar_channels_favourites_selection_changed(UiSidebarChannels *sidebar, GtkComboBox *box)
 {
     g_return_if_fail(IS_UI_SIDEBAR_CHANNELS(sidebar));
+    UiSidebarChannelsPrivate *priv = ui_sidebar_channels_get_instance_private(sidebar);
 
     fprintf(stderr, "favourites selection changed\n");
 
-    _ui_sidebar_channels_reset_channels_list(sidebar, sidebar->priv->channel_list_store);
+    _ui_sidebar_channels_reset_channels_list(sidebar, priv->channel_list_store);
 
     g_signal_emit(sidebar, ui_sidebar_signals[SIGNAL_FAVOURITES_LIST_CHANGED], 0,
-            sidebar->priv->selected_favourites_list_id);
+            priv->selected_favourites_list_id);
 }
 
 void _ui_sidebar_channels_reset_favourites_list(GtkListStore *store)
@@ -324,24 +325,25 @@ GtkWidget *_ui_sidebar_channels_create_favourites_list_widget(GtkListStore *stor
 
 static void populate_widget(UiSidebarChannels *self)
 {
+    UiSidebarChannelsPrivate *priv = ui_sidebar_channels_get_instance_private(self);
     GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
-    self->priv->favourites_list_widget =
-        _ui_sidebar_channels_create_favourites_list_widget(GTK_LIST_STORE(self->priv->favourites_list_store));
+    priv->favourites_list_widget =
+        _ui_sidebar_channels_create_favourites_list_widget(GTK_LIST_STORE(priv->favourites_list_store));
 
-    self->priv->channel_list = channel_list_new(TRUE);
-    GtkTreeView *tv = channel_list_get_tree_view(CHANNEL_LIST(self->priv->channel_list));
+    priv->channel_list = channel_list_new(TRUE);
+    GtkTreeView *tv = channel_list_get_tree_view(CHANNEL_LIST(priv->channel_list));
     gtk_tree_view_set_activate_on_single_click(tv, TRUE);
     g_signal_connect_swapped(G_OBJECT(tv), "row-activated",
             G_CALLBACK(_ui_sidebar_channels_channel_row_activated), self);
     g_signal_connect_swapped(G_OBJECT(tv), "button-press-event",
             G_CALLBACK(_ui_sidebar_channels_channel_button_press), self);
-    self->priv->cursor_changed_signal = g_signal_connect_swapped(G_OBJECT(tv), "cursor-changed",
+    priv->cursor_changed_signal = g_signal_connect_swapped(G_OBJECT(tv), "cursor-changed",
             G_CALLBACK(_ui_sidebar_channels_channel_cursor_changed), self);
-    g_signal_connect_swapped(G_OBJECT(self->priv->channel_list), "signal-source-changed",
+    g_signal_connect_swapped(G_OBJECT(priv->channel_list), "signal-source-changed",
             G_CALLBACK(_ui_sidebar_channels_signal_source_changed), self);
 
-    gtk_box_pack_start(GTK_BOX(vbox), self->priv->channel_list, TRUE, TRUE, 0);
-    gtk_box_pack_start(GTK_BOX(vbox), self->priv->favourites_list_widget, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(vbox), priv->channel_list, TRUE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(vbox), priv->favourites_list_widget, FALSE, FALSE, 0);
 
     gtk_container_add(GTK_CONTAINER(self), vbox);
     gtk_widget_show_all(vbox);
@@ -350,22 +352,21 @@ static void populate_widget(UiSidebarChannels *self)
 
 static void ui_sidebar_channels_init(UiSidebarChannels *self)
 {
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE(self,
-            UI_SIDEBAR_CHANNELS_TYPE, UiSidebarChannelsPrivate);
+    UiSidebarChannelsPrivate *priv = ui_sidebar_channels_get_instance_private(self);
 
     gtk_widget_set_has_window(GTK_WIDGET(self), FALSE);
 
-    self->priv->favourites_list_store = _ui_sidebar_channels_create_favourites_list_store();
+    priv->favourites_list_store = _ui_sidebar_channels_create_favourites_list_store();
 
     populate_widget(self);
 
-    self->priv->channel_list_store = channel_list_get_list_store(CHANNEL_LIST(self->priv->channel_list));
-    _ui_sidebar_channels_reset_favourites_list(self->priv->favourites_list_store);
+    priv->channel_list_store = channel_list_get_list_store(CHANNEL_LIST(priv->channel_list));
+    _ui_sidebar_channels_reset_favourites_list(priv->favourites_list_store);
 
-    gtk_combo_box_set_active(GTK_COMBO_BOX(self->priv->favourites_list_widget), 0);
-    g_signal_connect_swapped(G_OBJECT(self->priv->favourites_list_widget), "changed",
+    gtk_combo_box_set_active(GTK_COMBO_BOX(priv->favourites_list_widget), 0);
+    g_signal_connect_swapped(G_OBJECT(priv->favourites_list_widget), "changed",
             G_CALLBACK(_ui_sidebar_channels_favourites_selection_changed), self);
-    _ui_sidebar_channels_reset_channels_list(self, self->priv->channel_list_store);
+    _ui_sidebar_channels_reset_channels_list(self, priv->channel_list_store);
 
 }
 
@@ -377,23 +378,25 @@ GtkWidget *ui_sidebar_channels_new(void)
 void ui_sidebar_channels_update_favourites(UiSidebarChannels *sidebar)
 {
     g_return_if_fail(IS_UI_SIDEBAR_CHANNELS(sidebar));
-    gint last_id = gtk_combo_box_get_active(GTK_COMBO_BOX(sidebar->priv->favourites_list_widget));
-    _ui_sidebar_channels_reset_favourites_list(sidebar->priv->favourites_list_store);
-    gtk_combo_box_set_active(GTK_COMBO_BOX(sidebar->priv->favourites_list_widget), last_id);
+    UiSidebarChannelsPrivate *priv = ui_sidebar_channels_get_instance_private(sidebar);
+    gint last_id = gtk_combo_box_get_active(GTK_COMBO_BOX(priv->favourites_list_widget));
+    _ui_sidebar_channels_reset_favourites_list(priv->favourites_list_store);
+    gtk_combo_box_set_active(GTK_COMBO_BOX(priv->favourites_list_widget), last_id);
 }
 
 gboolean ui_sidebar_channels_find_list_by_id(UiSidebarChannels *sidebar, guint32 id, GtkTreeIter *match)
 {
     g_return_val_if_fail(IS_UI_SIDEBAR_CHANNELS(sidebar), FALSE);
+    UiSidebarChannelsPrivate *priv = ui_sidebar_channels_get_instance_private(sidebar);
 
     GtkTreeIter iter;
     gboolean valid;
     guint32 row_id;
-   
-    for (valid = gtk_tree_model_get_iter_first(GTK_TREE_MODEL(sidebar->priv->favourites_list_store), &iter);
+
+    for (valid = gtk_tree_model_get_iter_first(GTK_TREE_MODEL(priv->favourites_list_store), &iter);
          valid;
-         valid = gtk_tree_model_iter_next(GTK_TREE_MODEL(sidebar->priv->favourites_list_store), &iter)) {
-        gtk_tree_model_get(GTK_TREE_MODEL(sidebar->priv->favourites_list_store), &iter, FAV_ROW_ID, &row_id, -1);
+         valid = gtk_tree_model_iter_next(GTK_TREE_MODEL(priv->favourites_list_store), &iter)) {
+        gtk_tree_model_get(GTK_TREE_MODEL(priv->favourites_list_store), &iter, FAV_ROW_ID, &row_id, -1);
         if (row_id == id) {
             if (match)
                 *match = iter;
@@ -407,46 +410,49 @@ gboolean ui_sidebar_channels_find_list_by_id(UiSidebarChannels *sidebar, guint32
 guint32 ui_sidebar_channels_get_current_list(UiSidebarChannels *sidebar)
 {
     g_return_val_if_fail(IS_UI_SIDEBAR_CHANNELS(sidebar), 0);
+    UiSidebarChannelsPrivate *priv = ui_sidebar_channels_get_instance_private(sidebar);
 
     GtkTreeIter iter;
     GValue value = G_VALUE_INIT;
 
-    if (gtk_combo_box_get_active_iter(GTK_COMBO_BOX(sidebar->priv->favourites_list_widget), &iter)) {
-        gtk_tree_model_get_value(GTK_TREE_MODEL(sidebar->priv->favourites_list_store),
+    if (gtk_combo_box_get_active_iter(GTK_COMBO_BOX(priv->favourites_list_widget), &iter)) {
+        gtk_tree_model_get_value(GTK_TREE_MODEL(priv->favourites_list_store),
                 &iter, FAV_ROW_ID, &value);
-        sidebar->priv->selected_favourites_list_id = g_value_get_uint(&value);
+        priv->selected_favourites_list_id = g_value_get_uint(&value);
         g_value_unset(&value);
     }
 
-    return sidebar->priv->selected_favourites_list_id;
+    return priv->selected_favourites_list_id;
 }
 
 void ui_sidebar_channels_set_current_list(UiSidebarChannels *sidebar, guint32 id)
 {
     g_return_if_fail(IS_UI_SIDEBAR_CHANNELS(sidebar));
+    UiSidebarChannelsPrivate *priv = ui_sidebar_channels_get_instance_private(sidebar);
 
     GtkTreeIter iter;
 
     if (!ui_sidebar_channels_find_list_by_id(sidebar, id, &iter))
         return;
 
-    gtk_combo_box_set_active_iter(GTK_COMBO_BOX(sidebar->priv->favourites_list_widget), &iter);
+    gtk_combo_box_set_active_iter(GTK_COMBO_BOX(priv->favourites_list_widget), &iter);
 
-/*    _ui_sidebar_channels_reset_favourites_list(sidebar, sidebar->priv->channel_list_store);*/
+/*    _ui_sidebar_channels_reset_favourites_list(sidebar, priv->channel_list_store);*/
 }
 
 gboolean ui_sidebar_channels_find_channel_by_id(UiSidebarChannels *sidebar, guint32 id, GtkTreeIter *match)
 {
     g_return_val_if_fail(IS_UI_SIDEBAR_CHANNELS(sidebar), FALSE);
+    UiSidebarChannelsPrivate *priv = ui_sidebar_channels_get_instance_private(sidebar);
 
     GtkTreeIter iter;
     gboolean valid;
     gint row_id;
 
-    for (valid = gtk_tree_model_get_iter_first(GTK_TREE_MODEL(sidebar->priv->channel_list_store), &iter);
+    for (valid = gtk_tree_model_get_iter_first(GTK_TREE_MODEL(priv->channel_list_store), &iter);
          valid;
-         valid = gtk_tree_model_iter_next(GTK_TREE_MODEL(sidebar->priv->channel_list_store), &iter)) {
-        gtk_tree_model_get(GTK_TREE_MODEL(sidebar->priv->channel_list_store), &iter, CHNL_ROW_ID, &row_id, -1);
+         valid = gtk_tree_model_iter_next(GTK_TREE_MODEL(priv->channel_list_store), &iter)) {
+        gtk_tree_model_get(GTK_TREE_MODEL(priv->channel_list_store), &iter, CHNL_ROW_ID, &row_id, -1);
         if ((guint32)row_id == id) {
             if (match)
                 *match = iter;
@@ -460,18 +466,19 @@ gboolean ui_sidebar_channels_find_channel_by_id(UiSidebarChannels *sidebar, guin
 guint32 ui_sidebar_channels_get_current_channel(UiSidebarChannels *sidebar)
 {
     g_return_val_if_fail(IS_UI_SIDEBAR_CHANNELS(sidebar), 0);
+    UiSidebarChannelsPrivate *priv = ui_sidebar_channels_get_instance_private(sidebar);
 
     GtkTreeIter iter;
     GtkTreePath *path = NULL;
 
-    GtkTreeView *tv = channel_list_get_tree_view(CHANNEL_LIST(sidebar->priv->channel_list));
+    GtkTreeView *tv = channel_list_get_tree_view(CHANNEL_LIST(priv->channel_list));
 
     gtk_tree_view_get_cursor(tv, &path, NULL);
 
     if (!path)
         return 0;
 
-    if (!gtk_tree_model_get_iter(GTK_TREE_MODEL(sidebar->priv->channel_list_store), &iter, path)) {
+    if (!gtk_tree_model_get_iter(GTK_TREE_MODEL(priv->channel_list_store), &iter, path)) {
         gtk_tree_path_free(path);
         return 0;
     }
@@ -479,7 +486,7 @@ guint32 ui_sidebar_channels_get_current_channel(UiSidebarChannels *sidebar)
 
     guint32 selection_id;
 
-    gtk_tree_model_get(GTK_TREE_MODEL(sidebar->priv->channel_list_store), &iter, CHNL_ROW_ID, &selection_id, -1);
+    gtk_tree_model_get(GTK_TREE_MODEL(priv->channel_list_store), &iter, CHNL_ROW_ID, &selection_id, -1);
 
     return selection_id;
 }
@@ -487,26 +494,27 @@ guint32 ui_sidebar_channels_get_current_channel(UiSidebarChannels *sidebar)
 void ui_sidebar_channels_set_current_channel(UiSidebarChannels *sidebar, guint32 id, gboolean activate)
 {
     g_return_if_fail(IS_UI_SIDEBAR_CHANNELS(sidebar));
+    UiSidebarChannelsPrivate *priv = ui_sidebar_channels_get_instance_private(sidebar);
 
     GtkTreeIter iter;
 
     if (!ui_sidebar_channels_find_channel_by_id(sidebar, id, &iter)) {
         GtkTreePath *invalid_path = gtk_tree_path_new();
-        gtk_tree_view_set_cursor(channel_list_get_tree_view(CHANNEL_LIST(sidebar->priv->channel_list)),
+        gtk_tree_view_set_cursor(channel_list_get_tree_view(CHANNEL_LIST(priv->channel_list)),
                 invalid_path, NULL, FALSE);
         gtk_tree_path_free(invalid_path);
         return;
     }
 
-    GtkTreePath *path = gtk_tree_model_get_path(GTK_TREE_MODEL(sidebar->priv->channel_list_store), &iter);
+    GtkTreePath *path = gtk_tree_model_get_path(GTK_TREE_MODEL(priv->channel_list_store), &iter);
 
     if (path) {
-        GtkTreeView *tv = channel_list_get_tree_view(CHANNEL_LIST(sidebar->priv->channel_list));
+        GtkTreeView *tv = channel_list_get_tree_view(CHANNEL_LIST(priv->channel_list));
         if (!activate)
-            g_signal_handler_block(tv, sidebar->priv->cursor_changed_signal);
+            g_signal_handler_block(tv, priv->cursor_changed_signal);
         gtk_tree_view_set_cursor(tv, path, NULL, FALSE);
         if (!activate)
-            g_signal_handler_unblock(tv, sidebar->priv->cursor_changed_signal);
+            g_signal_handler_unblock(tv, priv->cursor_changed_signal);
         gtk_tree_path_free(path);
     }
 }
@@ -514,13 +522,15 @@ void ui_sidebar_channels_set_current_channel(UiSidebarChannels *sidebar, guint32
 const gchar *ui_sidebar_channels_get_current_signal_source(UiSidebarChannels *sidebar)
 {
     g_return_val_if_fail(IS_UI_SIDEBAR_CHANNELS(sidebar), NULL);
+    UiSidebarChannelsPrivate *priv = ui_sidebar_channels_get_instance_private(sidebar);
 
-    return channel_list_get_active_signal_source(CHANNEL_LIST(sidebar->priv->channel_list));
+    return channel_list_get_active_signal_source(CHANNEL_LIST(priv->channel_list));
 }
 
 void ui_sidebar_channels_set_current_signal_source(UiSidebarChannels *sidebar, const gchar *signal_source)
 {
     g_return_if_fail(IS_UI_SIDEBAR_CHANNELS(sidebar));
+    UiSidebarChannelsPrivate *priv = ui_sidebar_channels_get_instance_private(sidebar);
 
-    channel_list_set_active_signal_source(CHANNEL_LIST(sidebar->priv->channel_list), signal_source);
+    channel_list_set_active_signal_source(CHANNEL_LIST(priv->channel_list), signal_source);
 }

@@ -13,14 +13,10 @@ G_BEGIN_DECLS
 #define UI_SIDEBAR_CHANNELS_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), UI_SIDEBAR_CHANNELS_TYPE, UiSidebarChannelsClass))
 
 typedef struct _UiSidebarChannels UiSidebarChannels;
-typedef struct _UiSidebarChannelsPrivate UiSidebarChannelsPrivate;
 typedef struct _UiSidebarChannelsClass UiSidebarChannelsClass;
 
 struct _UiSidebarChannels {
     GtkBin parent_instance;
-
-    /*< private >*/
-    UiSidebarChannelsPrivate *priv;
 };
 
 struct _UiSidebarChannelsClass {
