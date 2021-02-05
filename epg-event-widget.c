@@ -85,8 +85,6 @@ static void epg_event_widget_class_init(EpgEventWidgetClass *klass)
                 "EPGEvent",
                 "The event data",
                 G_PARAM_READWRITE));
-
-    g_type_class_add_private(G_OBJECT_CLASS(klass), sizeof(EpgEventWidgetPrivate));
 }
 
 void epg_event_widget_update_event(EpgEventWidget *self)
