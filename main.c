@@ -202,8 +202,7 @@ void main_window_status_set_fullscreen(gboolean fullscreen)
 
 gboolean main_window_status_configure_event(GtkWidget *window, GdkEventConfigure *event, GuiWindowStatus *win_status)
 {
-    win_status->x = event->x;
-    win_status->y = event->y;
+    gtk_window_get_position(GTK_WINDOW(window), &win_status->x, &win_status->y);
     win_status->width = event->width;
     win_status->height = event->height;
 
@@ -779,6 +778,7 @@ void main_init_window(void)
     widgets.accelerator_group = gtk_accel_group_new();
     gtk_window_add_accel_group(GTK_WINDOW(widgets.main_window), widgets.accelerator_group);
 
+    gtk_window_set_gravity(GTK_WINDOW(widgets.main_window), GDK_GRAVITY_STATIC);
     if (appstatus.gui.main_window.initialized) {
         gtk_window_move(GTK_WINDOW(widgets.main_window),
                 appstatus.gui.main_window.x, appstatus.gui.main_window.y);
@@ -840,6 +840,7 @@ GtkWidget *main_init_channels_dialog_buttons(void)
 
 void main_position_dialog(GtkWidget *dialog, GuiWindowStatus *status, gint default_width, gint default_height)
 {
+    gtk_window_set_gravity(GTK_WINDOW(dialog), GDK_GRAVITY_STATIC);
     if (status->initialized) {
         gtk_window_move(GTK_WINDOW(dialog), status->x, status->y);
         gtk_window_set_default_size(GTK_WINDOW(dialog), status->width, status->height);
