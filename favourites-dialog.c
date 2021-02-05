@@ -30,7 +30,7 @@ struct _ChannelFavListEntry {
     ChannelFavList *parent;
 };
 
-struct _ChannelFavouritesDialogPrivate {
+typedef struct _ChannelFavouritesDialogPrivate {
     GtkListStore *channels_all;
     GtkListStore *channels_selected;
     GtkListStore *favourites;
@@ -47,7 +47,9 @@ struct _ChannelFavouritesDialogPrivate {
 
     CHANNEL_FAVOURITES_DIALOG_UPDATE_NOTIFY update_notify_cb;
     gpointer update_notify_data;
-};
+} ChannelFavouritesDialogPrivate;
+
+G_DEFINE_TYPE_WITH_PRIVATE(ChannelFavouritesDialog, channel_favourites_dialog, GTK_TYPE_DIALOG);
 
 void channel_favourites_dialog_add_favourite_to_store(ChannelFavouritesDialog *self, ChannelDBList *list);
 void channel_favourites_dialog_set_active_list(ChannelFavouritesDialog *self, guint32 list_id);
@@ -79,12 +81,13 @@ void channel_favourites_add_favourites_cb(ChannelData *channel, GList **list)
 
 void channel_favourites_dialog_read_favourites(ChannelFavouritesDialog *dialog)
 {
+    ChannelFavouritesDialogPrivate *priv = channel_favourites_dialog_get_instance_private(dialog);
     channel_db_list_foreach((CHANNEL_DB_LIST_FOREACH_CALLBACK)channel_favourites_dialog_add_favourites_list_cb,
-            &dialog->priv->fav_lists);
-    dialog->priv->fav_lists = g_list_reverse(dialog->priv->fav_lists);
+            &priv->fav_lists);
+    priv->fav_lists = g_list_reverse(priv->fav_lists);
 
     GList *tmp;
-    for (tmp = dialog->priv->fav_lists; tmp != NULL; tmp = g_list_next(tmp)) {
+    for (tmp = priv->fav_lists; tmp != NULL; tmp = g_list_next(tmp)) {
         channel_db_foreach(((ChannelFavList *)tmp->data)->data.id,
                 (CHANNEL_DB_FOREACH_CALLBACK)channel_favourites_add_favourites_cb,
                 &((ChannelFavList *)tmp->data)->entries);
@@ -123,14 +126,15 @@ gboolean channel_favourites_dialog_write_favourite_lists(ChannelFavouritesDialog
 {
     fprintf(stderr, "write lists\n");
     g_return_val_if_fail(IS_CHANNEL_FAVOURITES_DIALOG(dialog), FALSE);
+    ChannelFavouritesDialogPrivate *priv = channel_favourites_dialog_get_instance_private(dialog);
 
     GList *tmp;
     ChannelFavList *list;
     gboolean changes = FALSE;
-    
+
     channel_db_start_transaction();
 
-    for (tmp = dialog->priv->fav_lists; tmp != NULL; tmp = g_list_next(tmp)) {
+    for (tmp = priv->fav_lists; tmp != NULL; tmp = g_list_next(tmp)) {
         list = (ChannelFavList *)tmp->data;
         if (list->flags & (CFL_FLAG_CHANGED | CFL_FLAG_NEW)) {
             changes = TRUE;
@@ -142,8 +146,6 @@ gboolean channel_favourites_dialog_write_favourite_lists(ChannelFavouritesDialog
 
     return changes;
 }
-
-G_DEFINE_TYPE(ChannelFavouritesDialog, channel_favourites_dialog, GTK_TYPE_DIALOG);
 
 enum {
     PROP_0,
@@ -176,11 +178,12 @@ void _channel_favourites_dialog_free_channel_fav_list(ChannelFavList *list)
 static void channel_favourites_dialog_dispose(GObject *gobject)
 {
     ChannelFavouritesDialog *self = CHANNEL_FAVOURITES_DIALOG(gobject);
+    ChannelFavouritesDialogPrivate *priv = channel_favourites_dialog_get_instance_private(self);
 
-    g_list_free_full(self->priv->fav_lists,
+    g_list_free_full(priv->fav_lists,
             (GDestroyNotify)_channel_favourites_dialog_free_channel_fav_list);
-    self->priv->fav_lists = NULL;
-    self->priv->current_fav_list = NULL;
+    priv->fav_lists = NULL;
+    priv->current_fav_list = NULL;
 
     G_OBJECT_CLASS(channel_favourites_dialog_parent_class)->dispose(gobject);
 }
@@ -194,13 +197,14 @@ static void channel_favourites_dialog_set_property(GObject *object, guint prop_i
         const GValue *value, GParamSpec *spec)
 {
     ChannelFavouritesDialog *dialog = CHANNEL_FAVOURITES_DIALOG(object);
+    ChannelFavouritesDialogPrivate *priv = channel_favourites_dialog_get_instance_private(dialog);
 
     switch (prop_id) {
         case PROP_PARENT:
             channel_favourites_dialog_set_parent(dialog, GTK_WINDOW(g_value_get_object(value)));
             break;
         case PROP_RECORDER:
-            dialog->priv->recorder = g_value_get_pointer(value);
+            priv->recorder = g_value_get_pointer(value);
             break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, spec);
@@ -212,10 +216,11 @@ static void channel_favourites_dialog_get_property(GObject *object, guint prop_i
         GValue *value, GParamSpec *spec)
 {
     ChannelFavouritesDialog *dialog = CHANNEL_FAVOURITES_DIALOG(object);
+    ChannelFavouritesDialogPrivate *priv = channel_favourites_dialog_get_instance_private(dialog);
 
     switch (prop_id) {
         case PROP_PARENT:
-            g_value_set_object(value, dialog->priv->parent);
+            g_value_set_object(value, priv->parent);
             break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, spec);
@@ -246,8 +251,6 @@ static void channel_favourites_dialog_class_init(ChannelFavouritesDialogClass *k
                 "DVBRecorder",
                 "The recorder handle",
                 G_PARAM_WRITABLE));
-
-    g_type_class_add_private(G_OBJECT_CLASS(klass), sizeof(ChannelFavouritesDialogPrivate));
 }
 
 void favourites_dialog_response_cb(GtkDialog *dialog, gint response_id, gpointer data)
@@ -276,7 +279,7 @@ void _channel_favourites_drag_data_get(GtkWidget *widget, GdkDragContext *contex
 
     guint32 id;
     gtk_tree_model_get(store, &iter, CHNL_ROW_ID, &id, -1);
-    
+
     gtk_selection_data_set(sel_data,
             gdk_atom_intern("channel id pointer", FALSE),
             8,
@@ -391,10 +394,11 @@ void _channel_favourites_drag_data_received(GtkWidget *widget, GdkDragContext *c
         }
     }
 
+    ChannelFavouritesDialogPrivate *priv = channel_favourites_dialog_get_instance_private(dialog);
     if (chnl_data != NULL) {
         /* FIXME: fails when moving inside treeview */
-        if (dialog->priv->current_fav_list && 
-                g_list_find_custom(dialog->priv->current_fav_list->entries,
+        if (priv->current_fav_list &&
+                g_list_find_custom(priv->current_fav_list->entries,
                 GUINT_TO_POINTER(chnl_data->id),
                 (GCompareFunc)_fav_list_find_entry_by_id)) {
             fprintf(stderr, "already in list\n");
@@ -468,13 +472,13 @@ void _channel_favourites_drag_data_received(GtkWidget *widget, GdkDragContext *c
                 CHNL_ROW_SOURCE, chnl_data->signalsource,
                 CHNL_ROW_FOREGROUND, chnl_data->flags & CHNL_FLAG_DIRTY ? "gray" : NULL,
                 -1);
-        if (dialog->priv->current_fav_list) {
+        if (priv->current_fav_list) {
             ChannelFavListEntry *entry = g_malloc0(sizeof(ChannelFavListEntry));
             channel_data_copy(&entry->data, chnl_data);
             entry->flags = CFL_FLAG_NEW;
-            dialog->priv->current_fav_list->entries =
-                g_list_insert(dialog->priv->current_fav_list->entries, entry, insert_position);
-            dialog->priv->current_fav_list->flags |= CFL_FLAG_CHANGED;
+            priv->current_fav_list->entries =
+                g_list_insert(priv->current_fav_list->entries, entry, insert_position);
+            priv->current_fav_list->flags |= CFL_FLAG_CHANGED;
         }
 
         channel_data_free(chnl_data);
@@ -482,29 +486,29 @@ void _channel_favourites_drag_data_received(GtkWidget *widget, GdkDragContext *c
     else if (info == TARGET_ROW) {
         GList *link = NULL;
         gpointer link_data;
-        if (dialog->priv->current_fav_list &&
-                (link = g_list_find_custom(dialog->priv->current_fav_list->entries,
+        if (priv->current_fav_list &&
+                (link = g_list_find_custom(priv->current_fav_list->entries,
                         GUINT_TO_POINTER(chnl_id),
                         (GCompareFunc)_fav_list_find_entry_by_id))) {
             link_data = link->data;
-            fprintf(stderr, "move from %d to %d\n", g_list_position(dialog->priv->current_fav_list->entries, link), insert_position);
-            dialog->priv->current_fav_list->entries =
-                g_list_delete_link(dialog->priv->current_fav_list->entries, link);
+            fprintf(stderr, "move from %d to %d\n", g_list_position(priv->current_fav_list->entries, link), insert_position);
+            priv->current_fav_list->entries =
+                g_list_delete_link(priv->current_fav_list->entries, link);
             if (insert_position >= 0)
-                dialog->priv->current_fav_list->entries =
-                    g_list_insert(dialog->priv->current_fav_list->entries, link_data, insert_position);
+                priv->current_fav_list->entries =
+                    g_list_insert(priv->current_fav_list->entries, link_data, insert_position);
             else {
                 GList *tmp, *first_removed = NULL;
-                for (tmp = dialog->priv->current_fav_list->entries; tmp; tmp = g_list_next(tmp)) {
+                for (tmp = priv->current_fav_list->entries; tmp; tmp = g_list_next(tmp)) {
                     if (((ChannelFavListEntry *)tmp->data)->flags & CFL_FLAG_REMOVED) {
                         first_removed = tmp;
                         break;
                     }
                 }
-                dialog->priv->current_fav_list->entries =
-                    g_list_insert_before(dialog->priv->current_fav_list->entries, first_removed, link_data);
+                priv->current_fav_list->entries =
+                    g_list_insert_before(priv->current_fav_list->entries, first_removed, link_data);
             }
-            dialog->priv->current_fav_list->flags |= CFL_FLAG_CHANGED;
+            priv->current_fav_list->flags |= CFL_FLAG_CHANGED;
         }
     }
 }
@@ -528,6 +532,7 @@ static void favourites_dialog_add_list_dialog_run(ChannelFavouritesDialog *paren
 
     GtkResponseType result = gtk_dialog_run(GTK_DIALOG(dialog));
 
+    ChannelFavouritesDialogPrivate *priv = channel_favourites_dialog_get_instance_private(parent);
     if (result == GTK_RESPONSE_OK) {
         const gchar *title = gtk_entry_get_text(GTK_ENTRY(entry));
         if (title == NULL || title[0] == '\0')
@@ -537,7 +542,7 @@ static void favourites_dialog_add_list_dialog_run(ChannelFavouritesDialog *paren
         list->data.id = channel_db_list_add(title);
         list->flags |= CFL_FLAG_NEW;
 
-        parent->priv->fav_lists = g_list_append(parent->priv->fav_lists, list);
+        priv->fav_lists = g_list_append(priv->fav_lists, list);
         channel_favourites_dialog_add_favourite_to_store(parent, &list->data);
     }
 
@@ -555,9 +560,10 @@ void channel_favourites_dialog_add_favourite_to_store(ChannelFavouritesDialog *s
         return;
 
     GtkTreeIter iter;
-    gtk_list_store_append(GTK_LIST_STORE(self->priv->favourites), &iter);
+    ChannelFavouritesDialogPrivate *priv = channel_favourites_dialog_get_instance_private(self);
+    gtk_list_store_append(GTK_LIST_STORE(priv->favourites), &iter);
 
-    gtk_list_store_set(GTK_LIST_STORE(self->priv->favourites), &iter,
+    gtk_list_store_set(GTK_LIST_STORE(priv->favourites), &iter,
             FAV_ROW_ID, list->id,
             FAV_ROW_TITLE, list->title,
             -1);
@@ -566,7 +572,8 @@ void channel_favourites_dialog_add_favourite_to_store(ChannelFavouritesDialog *s
 void channel_favourites_dialog_fill_favourites_store(ChannelFavouritesDialog *self)
 {
     GList *tmp;
-    for (tmp = self->priv->fav_lists; tmp != NULL; tmp = g_list_next(tmp)) {
+    ChannelFavouritesDialogPrivate *priv = channel_favourites_dialog_get_instance_private(self);
+    for (tmp = priv->fav_lists; tmp != NULL; tmp = g_list_next(tmp)) {
         channel_favourites_dialog_add_favourite_to_store(self,
                 &((ChannelFavList *)tmp->data)->data);
     }
@@ -576,11 +583,12 @@ void channel_favourites_dialog_add_channel_to_favourites_store(ChannelFavourites
 {
     g_return_if_fail(IS_CHANNEL_FAVOURITES_DIALOG(self));
     g_return_if_fail(data != NULL);
+    ChannelFavouritesDialogPrivate *priv = channel_favourites_dialog_get_instance_private(self);
 
     GtkTreeIter iter;
-    gtk_list_store_append(GTK_LIST_STORE(self->priv->channels_selected), &iter);
+    gtk_list_store_append(GTK_LIST_STORE(priv->channels_selected), &iter);
 
-    gtk_list_store_set(GTK_LIST_STORE(self->priv->channels_selected), &iter,
+    gtk_list_store_set(GTK_LIST_STORE(priv->channels_selected), &iter,
             CHNL_ROW_ID, data->id,
             CHNL_ROW_TITLE, data->name,
             CHNL_ROW_SOURCE, data->signalsource,
@@ -590,18 +598,19 @@ void channel_favourites_dialog_add_channel_to_favourites_store(ChannelFavourites
 
 void channel_favourites_dialog_reset_favourites_channel_store(ChannelFavouritesDialog *self)
 {
-    GtkTreeView *tv = channel_list_get_tree_view(CHANNEL_LIST(self->priv->channel_fav_list));
+    ChannelFavouritesDialogPrivate *priv = channel_favourites_dialog_get_instance_private(self);
+    GtkTreeView *tv = channel_list_get_tree_view(CHANNEL_LIST(priv->channel_fav_list));
 
-    gtk_widget_set_sensitive(GTK_WIDGET(tv), self->priv->current_fav_list ? TRUE : FALSE);
-    
-    gtk_list_store_clear(self->priv->channels_selected);
+    gtk_widget_set_sensitive(GTK_WIDGET(tv), priv->current_fav_list ? TRUE : FALSE);
 
-    if (self->priv->current_fav_list == NULL)
+    gtk_list_store_clear(priv->channels_selected);
+
+    if (priv->current_fav_list == NULL)
         return;
 
     GList *tmp;
 
-    for (tmp = self->priv->current_fav_list->entries; tmp != NULL; tmp = g_list_next(tmp)) {
+    for (tmp = priv->current_fav_list->entries; tmp != NULL; tmp = g_list_next(tmp)) {
         channel_favourites_dialog_add_channel_to_favourites_store(self,
                 &((ChannelFavListEntry *)tmp->data)->data);
     }
@@ -609,19 +618,21 @@ void channel_favourites_dialog_reset_favourites_channel_store(ChannelFavouritesD
 
 void channel_favourites_dialog_update_channel_list(ChannelFavouritesDialog *self)
 {
-    channel_list_clear(CHANNEL_LIST(self->priv->channel_all_list));
-    channel_db_foreach(0, (CHANNEL_DB_FOREACH_CALLBACK)channel_list_fill_cb, self->priv->channel_all_list);
+    ChannelFavouritesDialogPrivate *priv = channel_favourites_dialog_get_instance_private(self);
+    channel_list_clear(CHANNEL_LIST(priv->channel_all_list));
+    channel_db_foreach(0, (CHANNEL_DB_FOREACH_CALLBACK)channel_list_fill_cb, priv->channel_all_list);
 }
 
 void channel_favourites_dialog_set_active_list(ChannelFavouritesDialog *self, guint32 list_id)
 {
-    if (self->priv->current_fav_list && self->priv->current_fav_list->data.id == list_id)
+    ChannelFavouritesDialogPrivate *priv = channel_favourites_dialog_get_instance_private(self);
+    if (priv->current_fav_list && priv->current_fav_list->data.id == list_id)
         return;
 
     GList *tmp;
-    for (tmp = self->priv->fav_lists; tmp != NULL; tmp = g_list_next(tmp)) {
+    for (tmp = priv->fav_lists; tmp != NULL; tmp = g_list_next(tmp)) {
         if (((ChannelFavList *)tmp->data)->data.id == list_id) {
-            self->priv->current_fav_list = (ChannelFavList *)tmp->data;
+            priv->current_fav_list = (ChannelFavList *)tmp->data;
             channel_favourites_dialog_reset_favourites_channel_store(self);
         }
     }
@@ -631,8 +642,9 @@ static void channel_favourites_dialog_list_changed(GtkComboBox *box, ChannelFavo
 {
     GtkTreeIter iter;
     GValue value = G_VALUE_INIT;
+    ChannelFavouritesDialogPrivate *priv = channel_favourites_dialog_get_instance_private(dialog);
     gtk_combo_box_get_active_iter(box, &iter);
-    gtk_tree_model_get_value(GTK_TREE_MODEL(dialog->priv->favourites),
+    gtk_tree_model_get_value(GTK_TREE_MODEL(priv->favourites),
             &iter, FAV_ROW_ID, &value);
     guint32 id = g_value_get_uint(&value);
 
@@ -642,11 +654,12 @@ static void channel_favourites_dialog_list_changed(GtkComboBox *box, ChannelFavo
 
 static void channel_favourites_dialog_scan_button_clicked(ChannelFavouritesDialog *dialog)
 {
-    GtkResponseType resp = ui_dialog_scan_show(GTK_WIDGET(dialog), dialog->priv->recorder);
+    ChannelFavouritesDialogPrivate *priv = channel_favourites_dialog_get_instance_private(dialog);
+    GtkResponseType resp = ui_dialog_scan_show(GTK_WIDGET(dialog), priv->recorder);
     if (resp == GTK_RESPONSE_OK) {
         channel_favourites_dialog_update_channel_list(dialog);
-        if (dialog->priv->update_notify_cb)
-            dialog->priv->update_notify_cb(dialog->priv->update_notify_data);
+        if (priv->update_notify_cb)
+            priv->update_notify_cb(priv->update_notify_data);
     }
 }
 
@@ -658,28 +671,29 @@ struct FavListRemoveData {
 static void channel_favourites_dialog_favourites_list_remove_activate(struct FavListRemoveData *data)
 {
     GtkTreeIter iter;
+    ChannelFavouritesDialogPrivate *priv = channel_favourites_dialog_get_instance_private(data->self);
 
-    if (!gtk_tree_model_get_iter(GTK_TREE_MODEL(data->self->priv->channels_selected), &iter, data->path))
+    if (!gtk_tree_model_get_iter(GTK_TREE_MODEL(priv->channels_selected), &iter, data->path))
         goto done;
 
     guint chnl_id = 0;
-    gtk_tree_model_get(GTK_TREE_MODEL(data->self->priv->channels_selected), &iter, CHNL_ROW_ID, &chnl_id, -1);
+    gtk_tree_model_get(GTK_TREE_MODEL(priv->channels_selected), &iter, CHNL_ROW_ID, &chnl_id, -1);
 
-    gtk_list_store_remove(data->self->priv->channels_selected, &iter);
+    gtk_list_store_remove(priv->channels_selected, &iter);
 
     GList *link = NULL;
-    if (data->self->priv->current_fav_list &&
-            (link = g_list_find_custom(data->self->priv->current_fav_list->entries,
+    if (priv->current_fav_list &&
+            (link = g_list_find_custom(priv->current_fav_list->entries,
                 GUINT_TO_POINTER(chnl_id),
                 (GCompareFunc)_fav_list_find_entry_by_id))) {
         ((ChannelFavListEntry *)link->data)->flags |= CFL_FLAG_REMOVED;
         gpointer link_data = link->data;
-        data->self->priv->current_fav_list->entries =
-            g_list_delete_link(data->self->priv->current_fav_list->entries, link);
-        data->self->priv->current_fav_list->entries =
-            g_list_append(data->self->priv->current_fav_list->entries, link_data);
+        priv->current_fav_list->entries =
+            g_list_delete_link(priv->current_fav_list->entries, link);
+        priv->current_fav_list->entries =
+            g_list_append(priv->current_fav_list->entries, link_data);
 
-        data->self->priv->current_fav_list->flags |= CFL_FLAG_CHANGED;
+        priv->current_fav_list->flags |= CFL_FLAG_CHANGED;
     }
 
 done:
@@ -729,8 +743,7 @@ static gboolean channel_favourites_dialog_favourites_list_button_press_event(
 
 static void channel_favourites_dialog_init(ChannelFavouritesDialog *self)
 {
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE(self,
-            CHANNEL_FAVOURITES_DIALOG_TYPE, ChannelFavouritesDialogPrivate);
+    ChannelFavouritesDialogPrivate *priv = channel_favourites_dialog_get_instance_private(self);
 
     gtk_window_set_title(GTK_WINDOW(self), _("Channel lists"));
     gtk_window_set_default_size(GTK_WINDOW(self), 600, 400);
@@ -741,7 +754,7 @@ static void channel_favourites_dialog_init(ChannelFavouritesDialog *self)
             NULL);
 
     /* build models */
-    self->priv->favourites = gtk_list_store_new(FAV_N_ROWS,
+    priv->favourites = gtk_list_store_new(FAV_N_ROWS,
             G_TYPE_UINT, G_TYPE_STRING);
 
     GtkWidget *content_area = gtk_dialog_get_content_area(GTK_DIALOG(self));
@@ -749,16 +762,16 @@ static void channel_favourites_dialog_init(ChannelFavouritesDialog *self)
     GtkWidget *hbox;
     hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 1);
 
-    self->priv->favourites_combo = gtk_combo_box_new_with_model(GTK_TREE_MODEL(self->priv->favourites));
+    priv->favourites_combo = gtk_combo_box_new_with_model(GTK_TREE_MODEL(priv->favourites));
     GtkCellRenderer *renderer = gtk_cell_renderer_text_new();
 
-    gtk_cell_layout_pack_start(GTK_CELL_LAYOUT(self->priv->favourites_combo), renderer, TRUE);
-    gtk_cell_layout_set_attributes(GTK_CELL_LAYOUT(self->priv->favourites_combo), renderer, "text", FAV_ROW_TITLE, NULL);
+    gtk_cell_layout_pack_start(GTK_CELL_LAYOUT(priv->favourites_combo), renderer, TRUE);
+    gtk_cell_layout_set_attributes(GTK_CELL_LAYOUT(priv->favourites_combo), renderer, "text", FAV_ROW_TITLE, NULL);
 
-    g_signal_connect(G_OBJECT(self->priv->favourites_combo), "changed",
+    g_signal_connect(G_OBJECT(priv->favourites_combo), "changed",
             G_CALLBACK(channel_favourites_dialog_list_changed), self);
 
-    gtk_box_pack_start(GTK_BOX(hbox), self->priv->favourites_combo, TRUE, TRUE, 3);
+    gtk_box_pack_start(GTK_BOX(hbox), priv->favourites_combo, TRUE, TRUE, 3);
 
     GtkWidget *button = gtk_button_new_with_label("Add list");
     g_signal_connect_swapped(G_OBJECT(button), "clicked",
@@ -769,7 +782,7 @@ static void channel_favourites_dialog_init(ChannelFavouritesDialog *self)
     g_signal_connect_swapped(G_OBJECT(button), "clicked",
             G_CALLBACK(channel_favourites_dialog_scan_button_clicked), self);
     gtk_box_pack_start(GTK_BOX(hbox), button, FALSE, FALSE, 3);
-    
+
     gtk_widget_show_all(hbox);
 
     gtk_box_pack_start(GTK_BOX(content_area), hbox, FALSE, FALSE, 3);
@@ -782,11 +795,11 @@ static void channel_favourites_dialog_init(ChannelFavouritesDialog *self)
         { "STRING", GTK_TARGET_SAME_APP, TARGET_STRING },
         { "INTEGER", GTK_TARGET_SAME_APP, TARGET_ID }
     };
- 
-    self->priv->channel_fav_list = channel_list_new(FALSE);
-    self->priv->channels_selected = channel_list_get_list_store(CHANNEL_LIST(self->priv->channel_fav_list));
+
+    priv->channel_fav_list = channel_list_new(FALSE);
+    priv->channels_selected = channel_list_get_list_store(CHANNEL_LIST(priv->channel_fav_list));
     /* drag and drop */
-    tv = channel_list_get_tree_view(CHANNEL_LIST(self->priv->channel_fav_list));
+    tv = channel_list_get_tree_view(CHANNEL_LIST(priv->channel_fav_list));
     fprintf(stderr, "Favlist: %p\n", tv);
     gtk_tree_view_enable_model_drag_dest(GTK_TREE_VIEW(tv), targetentries, 3,
             GDK_ACTION_COPY | GDK_ACTION_MOVE);
@@ -798,19 +811,19 @@ static void channel_favourites_dialog_init(ChannelFavouritesDialog *self)
             G_CALLBACK(_channel_favourites_favourites_drag_data_get), NULL);
     g_signal_connect_swapped(G_OBJECT(tv), "button-press-event",
             G_CALLBACK(channel_favourites_dialog_favourites_list_button_press_event), self);
-    gtk_box_pack_start(GTK_BOX(hbox), self->priv->channel_fav_list, TRUE, TRUE, 3);
+    gtk_box_pack_start(GTK_BOX(hbox), priv->channel_fav_list, TRUE, TRUE, 3);
     gtk_widget_set_sensitive(GTK_WIDGET(tv), FALSE);
 
-    self->priv->channel_all_list = channel_list_new(TRUE);
-    self->priv->channels_all = channel_list_get_list_store(CHANNEL_LIST(self->priv->channel_all_list));
+    priv->channel_all_list = channel_list_new(TRUE);
+    priv->channels_all = channel_list_get_list_store(CHANNEL_LIST(priv->channel_all_list));
     /* drag and drop */
-    tv = channel_list_get_tree_view(CHANNEL_LIST(self->priv->channel_all_list));
+    tv = channel_list_get_tree_view(CHANNEL_LIST(priv->channel_all_list));
     fprintf(stderr, "Channellist: %p\n", tv);
     gtk_tree_view_enable_model_drag_source(GTK_TREE_VIEW(tv), GDK_BUTTON1_MASK, targetentries, 3,
             GDK_ACTION_COPY | GDK_ACTION_MOVE);
     g_signal_connect(G_OBJECT(tv), "drag-data-get",
             G_CALLBACK(_channel_favourites_drag_data_get), NULL);
-    gtk_box_pack_start(GTK_BOX(hbox), self->priv->channel_all_list, TRUE, TRUE, 3);
+    gtk_box_pack_start(GTK_BOX(hbox), priv->channel_all_list, TRUE, TRUE, 3);
 
     gtk_widget_show_all(hbox);
 
@@ -830,7 +843,8 @@ GtkWidget *channel_favourites_dialog_new(GtkWindow *parent)
 
 void channel_favourites_dialog_set_parent(ChannelFavouritesDialog *dialog, GtkWindow *parent)
 {
-    dialog->priv->parent = parent;
+    ChannelFavouritesDialogPrivate *priv = channel_favourites_dialog_get_instance_private(dialog);
+    priv->parent = parent;
     gtk_window_set_transient_for(GTK_WINDOW(dialog), GTK_WINDOW(parent));
     gtk_window_set_destroy_with_parent(GTK_WINDOW(dialog), TRUE);
     gtk_window_set_modal(GTK_WINDOW(dialog), TRUE);
@@ -838,25 +852,27 @@ void channel_favourites_dialog_set_parent(ChannelFavouritesDialog *dialog, GtkWi
 
 void channel_favourites_dialog_set_update_notify(ChannelFavouritesDialog *dialog,
         CHANNEL_FAVOURITES_DIALOG_UPDATE_NOTIFY cb, gpointer userdata)
-{   
+{
     g_return_if_fail(IS_CHANNEL_FAVOURITES_DIALOG(dialog));
+    ChannelFavouritesDialogPrivate *priv = channel_favourites_dialog_get_instance_private(dialog);
 
-    dialog->priv->update_notify_cb = cb;
-    dialog->priv->update_notify_data = userdata;
+    priv->update_notify_cb = cb;
+    priv->update_notify_data = userdata;
 }
 
 gboolean channel_favourites_dialog_find_list_by_id(ChannelFavouritesDialog *dialog, guint32 list_id, GtkTreeIter *match)
 {
     g_return_val_if_fail(IS_CHANNEL_FAVOURITES_DIALOG(dialog), FALSE);
+    ChannelFavouritesDialogPrivate *priv = channel_favourites_dialog_get_instance_private(dialog);
 
     GtkTreeIter iter;
     gboolean valid;
     guint32 row_id;
 
-    for (valid = gtk_tree_model_get_iter_first(GTK_TREE_MODEL(dialog->priv->favourites), &iter);
+    for (valid = gtk_tree_model_get_iter_first(GTK_TREE_MODEL(priv->favourites), &iter);
          valid;
-         valid = gtk_tree_model_iter_next(GTK_TREE_MODEL(dialog->priv->favourites), &iter)) {
-        gtk_tree_model_get(GTK_TREE_MODEL(dialog->priv->favourites), &iter, FAV_ROW_ID, &row_id, -1);
+         valid = gtk_tree_model_iter_next(GTK_TREE_MODEL(priv->favourites), &iter)) {
+        gtk_tree_model_get(GTK_TREE_MODEL(priv->favourites), &iter, FAV_ROW_ID, &row_id, -1);
         if (row_id == list_id) {
             if (match)
                 *match = iter;
@@ -870,12 +886,13 @@ gboolean channel_favourites_dialog_find_list_by_id(ChannelFavouritesDialog *dial
 void channel_favourites_dialog_set_current_list(ChannelFavouritesDialog *dialog, guint32 list_id)
 {
     g_return_if_fail(IS_CHANNEL_FAVOURITES_DIALOG(dialog));
+    ChannelFavouritesDialogPrivate *priv = channel_favourites_dialog_get_instance_private(dialog);
 
     GtkTreeIter iter;
 
     if (!channel_favourites_dialog_find_list_by_id(dialog, list_id, &iter))
         return;
 
-    gtk_combo_box_set_active_iter(GTK_COMBO_BOX(dialog->priv->favourites_combo), &iter);
+    gtk_combo_box_set_active_iter(GTK_COMBO_BOX(priv->favourites_combo), &iter);
 }
 

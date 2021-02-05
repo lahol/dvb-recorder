@@ -12,7 +12,6 @@ G_BEGIN_DECLS
 #define CHANNEL_FAVOURITES_DIALOG_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), CHANNEL_FAVOURITES_DIALOG_TYPE, ChannelFavouritesDialogClass))
 
 typedef struct _ChannelFavouritesDialog ChannelFavouritesDialog;
-typedef struct _ChannelFavouritesDialogPrivate ChannelFavouritesDialogPrivate;
 typedef struct _ChannelFavouritesDialogClass ChannelFavouritesDialogClass;
 
 typedef enum {
@@ -23,9 +22,6 @@ typedef enum {
 
 struct _ChannelFavouritesDialog {
     GtkDialog parent_instance;
-
-    /*< private >*/
-    ChannelFavouritesDialogPrivate *priv;
 };
 
 struct _ChannelFavouritesDialogClass {
