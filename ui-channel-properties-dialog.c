@@ -3,15 +3,15 @@
 #include <dvbrecorder/channels.h>
 #include <dvbrecorder/channel-db.h>
 
-struct _UiChannelPropertiesDialogPrivate {
+typedef struct _UiChannelPropertiesDialogPrivate {
     /* private data */
     GtkWindow *parent;
     ChannelData *channel_data;
     GtkListStore *properties;
     GtkWidget *tree_view;
-};
+} UiChannelPropertiesDialogPrivate;
 
-G_DEFINE_TYPE(UiChannelPropertiesDialog, ui_channel_properties_dialog, GTK_TYPE_DIALOG);
+G_DEFINE_TYPE_WITH_PRIVATE(UiChannelPropertiesDialog, ui_channel_properties_dialog, GTK_TYPE_DIALOG);
 
 enum {
     PROP_0,
@@ -31,9 +31,10 @@ void ui_channel_properties_dialog_set_parent(UiChannelPropertiesDialog *dialog, 
 static void ui_channel_properties_dialog_dispose(GObject *gobject)
 {
     UiChannelPropertiesDialog *self = UI_CHANNEL_PROPERTIES_DIALOG(gobject);
+    UiChannelPropertiesDialogPrivate *priv = ui_channel_properties_dialog_get_instance_private(self);
 
-    channel_data_free(self->priv->channel_data);
-    self->priv->channel_data = NULL;
+    channel_data_free(priv->channel_data);
+    priv->channel_data = NULL;
 
     G_OBJECT_CLASS(ui_channel_properties_dialog_parent_class)->dispose(gobject);
 }
@@ -45,7 +46,7 @@ static void ui_channel_properties_dialog_finalize(GObject *gobject)
     G_OBJECT_CLASS(ui_channel_properties_dialog_parent_class)->finalize(gobject);
 }
 
-static void ui_channel_properties_dialog_set_property(GObject *object, guint prop_id, 
+static void ui_channel_properties_dialog_set_property(GObject *object, guint prop_id,
         const GValue *value, GParamSpec *spec)
 {
     UiChannelPropertiesDialog *self = UI_CHANNEL_PROPERTIES_DIALOG(object);
@@ -67,10 +68,11 @@ static void ui_channel_properties_dialog_get_property(GObject *object, guint pro
         GValue *value, GParamSpec *spec)
 {
     UiChannelPropertiesDialog *self = UI_CHANNEL_PROPERTIES_DIALOG(object);
+    UiChannelPropertiesDialogPrivate *priv = ui_channel_properties_dialog_get_instance_private(self);
 
     switch (prop_id) {
         case PROP_PARENT:
-            g_value_set_object(value, self->priv->parent);
+            g_value_set_object(value, priv->parent);
             break;
         case PROP_CHANNEL_ID:
             g_value_set_uint(value, ui_channel_properties_dialog_get_channel_id(self));
@@ -108,34 +110,33 @@ static void ui_channel_properties_dialog_class_init(UiChannelPropertiesDialogCla
                 G_MAXUINT32,
                 0,
                 G_PARAM_READWRITE));
-
-    g_type_class_add_private(G_OBJECT_CLASS(klass), sizeof(UiChannelPropertiesDialogPrivate));
 }
 
 static void populate_widget(UiChannelPropertiesDialog *self)
 {
+    UiChannelPropertiesDialogPrivate *priv = ui_channel_properties_dialog_get_instance_private(self);
     GtkWidget *content_area = gtk_dialog_get_content_area(GTK_DIALOG(self));
 
     GtkCellRenderer *renderer;
     GtkTreeViewColumn *column;
 
-    self->priv->tree_view = gtk_tree_view_new();
+    priv->tree_view = gtk_tree_view_new();
 
     renderer = gtk_cell_renderer_text_new();
     column = gtk_tree_view_column_new_with_attributes(_("Key"),
             renderer, "text", CHNL_PROP_KEY, NULL);
-    gtk_tree_view_append_column(GTK_TREE_VIEW(self->priv->tree_view), column);
+    gtk_tree_view_append_column(GTK_TREE_VIEW(priv->tree_view), column);
 
     renderer = gtk_cell_renderer_text_new();
     column = gtk_tree_view_column_new_with_attributes(_("Value"),
             renderer, "text", CHNL_PROP_VALUE, NULL);
-    gtk_tree_view_append_column(GTK_TREE_VIEW(self->priv->tree_view), column);
+    gtk_tree_view_append_column(GTK_TREE_VIEW(priv->tree_view), column);
 
     GtkWidget *scroll = gtk_scrolled_window_new(NULL, NULL);
     gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
             GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
     gtk_scrolled_window_set_shadow_type(GTK_SCROLLED_WINDOW(scroll), GTK_SHADOW_ETCHED_IN);
-    gtk_container_add(GTK_CONTAINER(scroll), self->priv->tree_view);
+    gtk_container_add(GTK_CONTAINER(scroll), priv->tree_view);
 
     gtk_box_pack_start(GTK_BOX(content_area), scroll, TRUE, TRUE, 0);
 
@@ -148,18 +149,17 @@ static void populate_widget(UiChannelPropertiesDialog *self)
 
 static void ui_channel_properties_dialog_init(UiChannelPropertiesDialog *self)
 {
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE(self,
-            UI_CHANNEL_PROPERTIES_DIALOG_TYPE, UiChannelPropertiesDialogPrivate);
+    UiChannelPropertiesDialogPrivate *priv = ui_channel_properties_dialog_get_instance_private(self);
 
 /*    gtk_widget_set_has_window(GTK_WIDGET(self), FALSE);*/
     populate_widget(self);
 
-    self->priv->properties = gtk_list_store_new(CHNL_PROP_N,
+    priv->properties = gtk_list_store_new(CHNL_PROP_N,
             G_TYPE_STRING,
             G_TYPE_STRING);
 
-    gtk_tree_view_set_model(GTK_TREE_VIEW(self->priv->tree_view),
-            GTK_TREE_MODEL(self->priv->properties));
+    gtk_tree_view_set_model(GTK_TREE_VIEW(priv->tree_view),
+            GTK_TREE_MODEL(priv->properties));
 }
 
 GtkWidget *ui_channel_properties_dialog_new(GtkWindow *parent)
@@ -170,28 +170,29 @@ GtkWidget *ui_channel_properties_dialog_new(GtkWindow *parent)
 void ui_channel_properties_dialog_set_channel_id(UiChannelPropertiesDialog *dialog, guint32 channel_id)
 {
     g_return_if_fail(IS_UI_CHANNEL_PROPERTIES_DIALOG(dialog));
+    UiChannelPropertiesDialogPrivate *priv = ui_channel_properties_dialog_get_instance_private(dialog);
 
-    if (dialog->priv->channel_data) {
-        if (dialog->priv->channel_data->id == channel_id)
+    if (priv->channel_data) {
+        if (priv->channel_data->id == channel_id)
             return;
-        channel_data_free(dialog->priv->channel_data);
+        channel_data_free(priv->channel_data);
     }
 
-    dialog->priv->channel_data = channel_db_get_channel(channel_id);
+    priv->channel_data = channel_db_get_channel(channel_id);
 
-    gtk_list_store_clear(dialog->priv->properties);
+    gtk_list_store_clear(priv->properties);
 
-    if (!dialog->priv->channel_data)
+    if (!priv->channel_data)
         return;
 
     GtkTreeIter iter;
     gchar numbuf[64];
     gchar *buf;
-    ChannelData *data = dialog->priv->channel_data;
+    ChannelData *data = priv->channel_data;
 
 #define SET_VALUE(key, value) do {\
-    gtk_list_store_append(dialog->priv->properties, &iter);\
-    gtk_list_store_set(dialog->priv->properties, &iter,\
+    gtk_list_store_append(priv->properties, &iter);\
+    gtk_list_store_set(priv->properties, &iter,\
             CHNL_PROP_KEY, (key),\
             CHNL_PROP_VALUE, (value),\
             -1);\
@@ -227,15 +228,17 @@ void ui_channel_properties_dialog_set_channel_id(UiChannelPropertiesDialog *dial
 guint32 ui_channel_properties_dialog_get_channel_id(UiChannelPropertiesDialog *dialog)
 {
     g_return_val_if_fail(IS_UI_CHANNEL_PROPERTIES_DIALOG(dialog), 0);
+    UiChannelPropertiesDialogPrivate *priv = ui_channel_properties_dialog_get_instance_private(dialog);
 
-    if (dialog->priv->channel_data)
-        return dialog->priv->channel_data->id;
+    if (priv->channel_data)
+        return priv->channel_data->id;
     return 0;
 }
 
 void ui_channel_properties_dialog_set_parent(UiChannelPropertiesDialog *dialog, GtkWindow *parent)
 {
-    dialog->priv->parent = parent;
+    UiChannelPropertiesDialogPrivate *priv = ui_channel_properties_dialog_get_instance_private(dialog);
+    priv->parent = parent;
     gtk_window_set_transient_for(GTK_WINDOW(dialog), GTK_WINDOW(parent));
     gtk_window_set_destroy_with_parent(GTK_WINDOW(dialog), TRUE);
     gtk_window_set_modal(GTK_WINDOW(dialog), FALSE);
