@@ -14,14 +14,10 @@ G_BEGIN_DECLS
 #define UI_EPG_EVENT_DETAIL_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), UI_EPG_EVENT_DETAIL_TYPE, UiEpgEventDetailClass))
 
 typedef struct _UiEpgEventDetail UiEpgEventDetail;
-typedef struct _UiEpgEventDetailPrivate UiEpgEventDetailPrivate;
 typedef struct _UiEpgEventDetailClass UiEpgEventDetailClass;
 
 struct _UiEpgEventDetail {
     GtkBin parent_instance;
-
-    /*< private >*/
-    UiEpgEventDetailPrivate *priv;
 };
 
 struct _UiEpgEventDetailClass {

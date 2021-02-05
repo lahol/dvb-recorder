@@ -14,7 +14,6 @@ G_BEGIN_DECLS
 #define CHANNEL_LIST_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), CHANNEL_LIST_TYPE, ChannelListClass))
 
 typedef struct _ChannelList ChannelList;
-typedef struct _ChannelListPrivate ChannelListPrivate;
 typedef struct _ChannelListClass ChannelListClass;
 
 typedef enum {
@@ -27,9 +26,6 @@ typedef enum {
 
 struct _ChannelList {
     GtkBin parent_instance;
-
-    /*< private >*/
-    ChannelListPrivate *priv;
 };
 
 struct _ChannelListClass {

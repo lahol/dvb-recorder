@@ -14,14 +14,10 @@ G_BEGIN_DECLS
 #define EPG_EVENT_WIDGET_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), EPG_EVENT_WIDGET_TYPE, EpgEventWidgetClass))
 
 typedef struct _EpgEventWidget EpgEventWidget;
-typedef struct _EpgEventWidgetPrivate EpgEventWidgetPrivate;
 typedef struct _EpgEventWidgetClass EpgEventWidgetClass;
 
 struct _EpgEventWidget {
     GtkBin parent_instance;
-
-    /*< private >*/
-    EpgEventWidgetPrivate *priv;
 };
 
 struct _EpgEventWidgetClass {

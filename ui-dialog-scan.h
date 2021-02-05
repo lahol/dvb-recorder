@@ -13,14 +13,10 @@ G_BEGIN_DECLS
 #define UI_DIALOG_SCAN_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), UI_DIALOG_SCAN_TYPE, UiDialogScanClass))
 
 typedef struct _UiDialogScan UiDialogScan;
-typedef struct _UiDialogScanPrivate UiDialogScanPrivate;
 typedef struct _UiDialogScanClass UiDialogScanClass;
 
 struct _UiDialogScan {
     GtkDialog parent_instance;
-
-    /*< private >*/
-    UiDialogScanPrivate *priv;
 };
 
 struct _UiDialogScanClass {

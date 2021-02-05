@@ -38,7 +38,7 @@ struct _FilterCheckEntry {
     { FILTER_CHECK_OTHER, DVB_FILTER_OTHER, "Other" }
 };
 
-struct _UiRecorderSettingsDialogPrivate {
+typedef struct _UiRecorderSettingsDialogPrivate {
     GtkWindow *parent;
 
     DVBRecorder *recorder;
@@ -46,9 +46,9 @@ struct _UiRecorderSettingsDialogPrivate {
     DVBFilterType filter;
 
     GtkWidget *checkbuttons[N_FILTER_CHECK];
-};
+} UiRecorderSettingsDialogPrivate;
 
-G_DEFINE_TYPE(UiRecorderSettingsDialog, ui_recorder_settings_dialog, GTK_TYPE_DIALOG);
+G_DEFINE_TYPE_WITH_PRIVATE(UiRecorderSettingsDialog, ui_recorder_settings_dialog, GTK_TYPE_DIALOG);
 
 enum {
     PROP_0,
@@ -76,7 +76,7 @@ static void ui_recorder_settings_dialog_finalize(GObject *gobject)
     G_OBJECT_CLASS(ui_recorder_settings_dialog_parent_class)->finalize(gobject);
 }
 
-static void ui_recorder_settings_dialog_set_property(GObject *object, guint prop_id, 
+static void ui_recorder_settings_dialog_set_property(GObject *object, guint prop_id,
         const GValue *value, GParamSpec *spec)
 {
     UiRecorderSettingsDialog *self = UI_RECORDER_SETTINGS_DIALOG(object);
@@ -98,13 +98,14 @@ static void ui_recorder_settings_dialog_get_property(GObject *object, guint prop
         GValue *value, GParamSpec *spec)
 {
     UiRecorderSettingsDialog *self = UI_RECORDER_SETTINGS_DIALOG(object);
+    UiRecorderSettingsDialogPrivate *priv = ui_recorder_settings_dialog_get_instance_private(self);
 
     switch (prop_id) {
     	case PROP_PARENT:
-            g_value_set_object(value, self->priv->parent);
+            g_value_set_object(value, priv->parent);
             break;
         case PROP_RECORDER:
-            g_value_set_pointer(value, self->priv->recorder);
+            g_value_set_pointer(value, priv->recorder);
             break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, spec);
@@ -136,8 +137,6 @@ static void ui_recorder_settings_dialog_class_init(UiRecorderSettingsDialogClass
                 "Recorder",
                 "Recorder",
                 G_PARAM_READWRITE));
-
-    g_type_class_add_private(G_OBJECT_CLASS(klass), sizeof(UiRecorderSettingsDialogPrivate));
 }
 
 void ui_recorder_settings_dialog_response_cb(GtkDialog *dialog, gint response_id, gpointer data)
@@ -150,15 +149,16 @@ void ui_recorder_settings_dialog_response_cb(GtkDialog *dialog, gint response_id
 
 static void populate_widget(UiRecorderSettingsDialog *self)
 {
+    UiRecorderSettingsDialogPrivate *priv = ui_recorder_settings_dialog_get_instance_private(self);
     fprintf(stderr, "populate widget\n");
     /* video, audio, teletext, subtitles, pat, pmt, eit, sdt, rst, other */
     GtkWidget *content_area = gtk_dialog_get_content_area(GTK_DIALOG(self));
 
     guint i;
     for (i = 0; i < N_FILTER_CHECK; ++i) {
-        self->priv->checkbuttons[i] = gtk_check_button_new_with_label(filter_check_entries[i].title);
-        gtk_box_pack_start(GTK_BOX(content_area), self->priv->checkbuttons[i], FALSE, FALSE, 3);
-        gtk_widget_show(self->priv->checkbuttons[i]);
+        priv->checkbuttons[i] = gtk_check_button_new_with_label(filter_check_entries[i].title);
+        gtk_box_pack_start(GTK_BOX(content_area), priv->checkbuttons[i], FALSE, FALSE, 3);
+        gtk_widget_show(priv->checkbuttons[i]);
     }
 
     gtk_dialog_add_buttons(GTK_DIALOG(self),
@@ -171,9 +171,6 @@ static void populate_widget(UiRecorderSettingsDialog *self)
 
 static void ui_recorder_settings_dialog_init(UiRecorderSettingsDialog *self)
 {
-    self->priv = G_TYPE_INSTANCE_GET_PRIVATE(self,
-            UI_RECORDER_SETTINGS_DIALOG_TYPE, UiRecorderSettingsDialogPrivate);
-
     gtk_window_set_title(GTK_WINDOW(self), _("Recorder settings"));
 
     populate_widget(self);
@@ -189,7 +186,8 @@ GtkWidget *ui_recorder_settings_dialog_new(GtkWindow *parent)
 void ui_recorder_settings_dialog_set_parent(UiRecorderSettingsDialog *dialog, GtkWindow *parent)
 {
     fprintf(stderr, "set parent\n");
-    dialog->priv->parent = parent;
+    UiRecorderSettingsDialogPrivate *priv = ui_recorder_settings_dialog_get_instance_private(dialog);
+    priv->parent = parent;
     gtk_window_set_transient_for(GTK_WINDOW(dialog), GTK_WINDOW(parent));
     gtk_window_set_destroy_with_parent(GTK_WINDOW(dialog), TRUE);
     gtk_window_set_modal(GTK_WINDOW(dialog), TRUE);
@@ -198,28 +196,31 @@ void ui_recorder_settings_dialog_set_parent(UiRecorderSettingsDialog *dialog, Gt
 void ui_recorder_settings_dialog_set_recorder(UiRecorderSettingsDialog *dialog, DVBRecorder *recorder)
 {
     fprintf(stderr, "ui_recorder_settings_dialog_set_recorder\n");
-    dialog->priv->recorder = recorder;
+    UiRecorderSettingsDialogPrivate *priv = ui_recorder_settings_dialog_get_instance_private(dialog);
+    priv->recorder = recorder;
     ui_recorder_settings_dialog_check_filter(dialog);
 }
 
 void ui_recorder_settings_dialog_check_filter(UiRecorderSettingsDialog *dialog)
 {
-    DVBFilterType filter = dvb_recorder_get_record_filter(dialog->priv->recorder);
+    UiRecorderSettingsDialogPrivate *priv = ui_recorder_settings_dialog_get_instance_private(dialog);
+    DVBFilterType filter = dvb_recorder_get_record_filter(priv->recorder);
     guint i;
     for (i = 0; i < N_FILTER_CHECK; ++i) {
-        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(dialog->priv->checkbuttons[i]),
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(priv->checkbuttons[i]),
                 (filter & filter_check_entries[i].flag));
     }
 }
 
 void ui_recorder_settings_dialog_set_recorder_filter(UiRecorderSettingsDialog *dialog)
 {
+    UiRecorderSettingsDialogPrivate *priv = ui_recorder_settings_dialog_get_instance_private(dialog);
     DVBFilterType filter = DVB_FILTER_ALL;
     guint i;
     for (i = 0; i < N_FILTER_CHECK; ++i) {
-        if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(dialog->priv->checkbuttons[i])))
+        if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(priv->checkbuttons[i])))
             filter &= ~filter_check_entries[i].flag;
     }
 
-    dvb_recorder_set_record_filter(dialog->priv->recorder, filter);
+    dvb_recorder_set_record_filter(priv->recorder, filter);
 }

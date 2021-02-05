@@ -234,7 +234,7 @@ gboolean video_output_snapshot(VideoOutput *vo, const gchar *filename)
     gst_structure_get_int(s, "width", &width);
     gst_structure_get_int(s, "height", &height);
     bpp = 24;
-    
+
     LOG("w: %d, h: %d, bpp: %d\n", width, height, bpp);
 
 
@@ -266,9 +266,9 @@ error:
         gst_memory_unref(memory);
     if (sample)
         gst_sample_unref(sample);
-    
+
     return result;
-    
+
 #else
     GstBuffer *buffer = NULL;
 
@@ -384,7 +384,7 @@ gpointer video_output_thread_proc(VideoOutput *vo)
     while (1) {
         if (poll(pfd, 2, 1500)) {
             LOG("poll (events: 0x%02x, 0x%02x)\n", pfd[0].revents, pfd[1].revents);
-            
+
             if (pfd[1].revents & POLLIN) {
                 bytes_read = read(pfd[1].fd, buffer, 16384);
                 if (bytes_read <= 0) {
@@ -572,7 +572,7 @@ static void video_output_gst_state_changed_cb(GstBus *bus, GstMessage *msg, Vide
                              "hue", vo->video_hue,
                              "saturation", vo->video_saturation,
                              NULL);
-                             
+
                 vo->event_cb(vo, VIDEO_OUTPUT_EVENT_READY, vo->event_data);
                 break;
             case GST_STATE_PAUSED:

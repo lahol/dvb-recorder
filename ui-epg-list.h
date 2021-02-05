@@ -14,14 +14,10 @@ G_BEGIN_DECLS
 #define UI_EPG_LIST_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), UI_EPG_LIST_TYPE, UiEpgListClass))
 
 typedef struct _UiEpgList UiEpgList;
-typedef struct _UiEpgListPrivate UiEpgListPrivate;
 typedef struct _UiEpgListClass UiEpgListClass;
 
 struct _UiEpgList {
     GtkBin parent_instance;
-
-    /*< private >*/
-    UiEpgListPrivate *priv;
 };
 
 struct _UiEpgListClass {

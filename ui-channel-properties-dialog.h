@@ -13,14 +13,10 @@ G_BEGIN_DECLS
 #define UI_CHANNEL_PROPERTIES_DIALOG_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS((obj), UI_CHANNEL_PROPERTIES_DIALOG_TYPE, UiChannelPropertiesDialogClass))
 
 typedef struct _UiChannelPropertiesDialog UiChannelPropertiesDialog;
-typedef struct _UiChannelPropertiesDialogPrivate UiChannelPropertiesDialogPrivate;
 typedef struct _UiChannelPropertiesDialogClass UiChannelPropertiesDialogClass;
 
 struct _UiChannelPropertiesDialog {
     GtkDialog parent_instance;
-
-    /*< private >*/
-    UiChannelPropertiesDialogPrivate *priv;
 };
 
 struct _UiChannelPropertiesDialogClass {

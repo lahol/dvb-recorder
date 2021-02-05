@@ -11,7 +11,7 @@ gboolean util_write_data_to_png(const gchar *filename, guint8 *buffer, guint wid
 
     FILE *out = NULL;
     gboolean result = FALSE;
-    
+
     if ((out = fopen(filename, "wb")) == NULL) {
         fprintf(stderr, "Could not open file %s.\n", filename);
         goto done;
