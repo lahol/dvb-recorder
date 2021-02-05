@@ -11,7 +11,7 @@ gboolean initalized = FALSE;
 void log_reinit(void)
 {
     gchar *fname = NULL;
-    if (config_get("Main", "Logfile", CFG_TYPE_STRING, &fname) != 0) {
+    if (config_get("main", "logfile", CFG_TYPE_STRING, &fname) != 0) {
         fname = g_build_filename(
                 g_get_user_data_dir(),
                 "dvb-recorder.log",
