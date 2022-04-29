@@ -445,7 +445,11 @@ static void video_output_pad_added_handler(GstElement *src, GstPad *new_pad, Vid
     LOG("VideoOutput, pad new type: %s\n", new_pad_type);
 
     if (g_str_has_prefix(new_pad_type, "audio")) {
+#if GST_CHECK_VERSION(1, 20, 0)
+        sink_pad = gst_element_request_pad_simple(vo->audio_input_selector, "sink_%u");
+#else
         sink_pad = gst_element_get_request_pad(vo->audio_input_selector, "sink_%u");
+#endif
         video_output_add_request_pad(vo, vo->audio_input_selector, sink_pad);
         if (sink_pad)
             g_queue_push_tail(&vo->audio_channels, sink_pad);
@@ -721,7 +725,11 @@ void video_output_setup_pipeline(VideoOutput *vo)
         LOG("Elements could not be linked. (source -> decoder)\n");
     }
 
+#if GST_CHECK_VERSION(1, 20, 0)
+    GstPad *playsink_video_pad = gst_element_request_pad_simple(vo->playsink, "video_sink");
+#else
     GstPad *playsink_video_pad = gst_element_get_request_pad(vo->playsink, "video_sink");
+#endif
     video_output_add_request_pad(vo, vo->playsink, playsink_video_pad);
     GstPad *videoconvert_pad = gst_element_get_static_pad(vo->cairooverlay, "src");
     GstPadLinkReturn ret;
@@ -737,7 +745,11 @@ void video_output_setup_pipeline(VideoOutput *vo)
     }
 
     GstPad *main_video_pad = gst_element_get_static_pad(vo->cairooverlay, "sink");
+#if GST_CHECK_VERSION(1, 20, 0)
+    GstPad *video_tee_pad = gst_element_request_pad_simple(vo->tee, "src_%u");
+#else
     GstPad *video_tee_pad = gst_element_get_request_pad(vo->tee, "src_%u");
+#endif
     video_output_add_request_pad(vo, vo->tee, video_tee_pad);
     if (main_video_pad && video_tee_pad) {
         ret = gst_pad_link(video_tee_pad, main_video_pad);
@@ -753,7 +765,11 @@ void video_output_setup_pipeline(VideoOutput *vo)
         gst_object_unref(video_tee_pad);
 
     GstPad *app_video_pad = gst_element_get_static_pad(vo->appsink, "sink");
+#if GST_CHECK_VERSION(1, 20, 0)
+    video_tee_pad = gst_element_request_pad_simple(vo->tee, "src_%u");
+#else
     video_tee_pad = gst_element_get_request_pad(vo->tee, "src_%u");
+#endif
     video_output_add_request_pad(vo, vo->tee, video_tee_pad);
     if (app_video_pad && video_tee_pad) {
         ret = gst_pad_link(video_tee_pad, app_video_pad);
@@ -768,7 +784,11 @@ void video_output_setup_pipeline(VideoOutput *vo)
     if (video_tee_pad)
         gst_object_unref(video_tee_pad);
 
+#if GST_CHECK_VERSION(1, 20, 0)
+    GstPad *playsink_audio_pad = gst_element_request_pad_simple(vo->playsink, "audio_sink");
+#else
     GstPad *playsink_audio_pad = gst_element_get_request_pad(vo->playsink, "audio_sink");
+#endif
     video_output_add_request_pad(vo, vo->playsink, playsink_audio_pad);
     GstPad *input_selector_pad = gst_element_get_static_pad(vo->audio_input_selector, "src");
     if (playsink_audio_pad && input_selector_pad) {
