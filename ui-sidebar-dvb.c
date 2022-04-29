@@ -135,19 +135,11 @@ static void ui_sidebar_channels_class_init(UiSidebarChannelsClass *klass)
                 NULL);
 }
 
-static void _ui_sidebar_channels_channel_row_activated(UiSidebarChannels *sidebar, GtkTreePath *path, GtkTreeViewColumn *column,
-        GtkTreeView *tree_view)
+static void _ui_sidebar_channels_channel_channel_selected(UiSidebarChannels *sidebar, guint channel_id, gpointer userdata)
 {
-    LOG("row activated\n");
-    g_return_if_fail(IS_UI_SIDEBAR_CHANNELS(sidebar));
-
-    UiSidebarChannelsPrivate *priv = ui_sidebar_channels_get_instance_private(sidebar);
-    if (priv == NULL)
-        return;
-
-    guint32 selection_id = channel_list_get_channel_from_path(CHANNEL_LIST(priv->channel_list), path);
-
-    g_signal_emit(sidebar, ui_sidebar_signals[SIGNAL_CHANNEL_SELECTED], 0, selection_id);
+    /* Just promote the signal. */
+    LOG("channel-selected: %u\n", channel_id);
+    g_signal_emit(sidebar, ui_sidebar_signals[SIGNAL_CHANNEL_SELECTED], 0, channel_id);
 }
 
 struct _UiSidebarContextData {
@@ -306,8 +298,8 @@ static void populate_widget(UiSidebarChannels *self)
     priv->channel_list = channel_list_new(TRUE);
     GtkTreeView *tv = channel_list_get_tree_view(CHANNEL_LIST(priv->channel_list));
     gtk_tree_view_set_activate_on_single_click(tv, TRUE);
-    g_signal_connect_swapped(G_OBJECT(tv), "row-activated",
-            G_CALLBACK(_ui_sidebar_channels_channel_row_activated), self);
+    g_signal_connect_swapped(G_OBJECT(priv->channel_list), "channel-selected",
+            G_CALLBACK(_ui_sidebar_channels_channel_channel_selected), self);
     g_signal_connect_swapped(G_OBJECT(tv), "button-press-event",
             G_CALLBACK(_ui_sidebar_channels_channel_button_press), self);
     priv->cursor_changed_signal = g_signal_connect_swapped(G_OBJECT(tv), "cursor-changed",

@@ -2,6 +2,8 @@
 #include <glib/gi18n.h>
 #include <glib/gprintf.h>
 
+#include "logging.h"
+
 typedef struct _ChannelListPrivate {
     GtkTreeModel *model;
 
@@ -44,7 +46,8 @@ enum {
 };
 
 enum {
-    SIGNAL_SIGNAL_SOURCE_CHANGED = 0,
+    SIGNAL_CHANNEL_SELECTED = 0,
+    SIGNAL_SIGNAL_SOURCE_CHANGED = 1,
     N_SIGNALS
 };
 
@@ -145,6 +148,19 @@ static void channel_list_class_init(ChannelListClass *klass)
                 TRUE,
                 G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
+    channel_list_signals[SIGNAL_CHANNEL_SELECTED] =
+        g_signal_new("channel-selected",
+                G_TYPE_FROM_CLASS(gobject_class),
+                G_SIGNAL_RUN_LAST,
+                0,
+                NULL,
+                NULL,
+                NULL,
+                G_TYPE_NONE,
+                1,
+                G_TYPE_UINT,
+                NULL);
+
     channel_list_signals[SIGNAL_SIGNAL_SOURCE_CHANGED] =
         g_signal_new("signal-source-changed",
                 G_TYPE_FROM_CLASS(gobject_class),
@@ -157,6 +173,22 @@ static void channel_list_class_init(ChannelListClass *klass)
                 1,
                 G_TYPE_STRING,
                 NULL);
+}
+
+static void _channel_list_channel_row_activated(
+        ChannelList *self,
+        GtkTreePath *path,
+        GtkTreeViewColumn *column,
+        GtkTreeView *tree_view)
+{
+    LOG("row activated\n");
+    g_return_if_fail(IS_CHANNEL_LIST(self));
+
+    ChannelListPrivate *priv = channel_list_get_instance_private(self);
+    g_return_if_fail(priv != NULL);
+
+    guint32 selection_id = channel_list_get_channel_from_path(self, path);
+    g_signal_emit(self, channel_list_signals[SIGNAL_CHANNEL_SELECTED], 0, selection_id);
 }
 
 /* data = ChannelListPrivate */
@@ -261,6 +293,9 @@ static void populate_widget(ChannelList *self)
     column = gtk_tree_view_column_new_with_attributes(_("Title"),
             renderer, "text", CHNL_ROW_TITLE, "foreground", CHNL_ROW_FOREGROUND, NULL);
     gtk_tree_view_append_column(GTK_TREE_VIEW(priv->channel_tree_view), column);
+
+    g_signal_connect_swapped(G_OBJECT(priv->channel_tree_view), "row-activated",
+            G_CALLBACK(_channel_list_channel_row_activated), self);
 
     priv->selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(priv->channel_tree_view));
 
