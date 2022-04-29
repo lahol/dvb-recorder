@@ -36,6 +36,8 @@ GType channel_list_get_type(void) G_GNUC_CONST;
 
 GtkWidget *channel_list_new(gboolean filterable);
 
+void channel_list_set_change_on_select(ChannelList *channel_list, gboolean change_on_select);
+
 void channel_list_set_model(ChannelList *channel_list, GtkTreeModel *model);
 GtkTreeSelection *channel_list_get_selection(ChannelList *channel_list);
 GtkListStore *channel_list_get_list_store(ChannelList *channel_list);
@@ -43,12 +45,18 @@ GtkTreeView *channel_list_get_tree_view(ChannelList *channel_list);
 
 void channel_list_fill_cb(ChannelData *data, ChannelList *channel_list);
 void channel_list_clear(ChannelList *channel_list);
+void channel_list_reset(ChannelList *channel_list, guint32 list_id);
 void channel_list_set_active_signal_source(ChannelList *channel_list, const gchar *signal_source);
 const gchar *channel_list_get_active_signal_source(ChannelList *channel_list);
 
 #define CHANNEL_LIST_ID_INVALID ((guint32)0)
 
-void channel_list_set_channel_selection(ChannelList *channel_list, guint32 id);
+typedef enum {
+    ChannelListSelectionNone = (0),
+    ChannelListSelectionActivate = (1 << 0),
+    ChannelListSelectionScrollToCell = (1 << 1)
+} ChannelListSetSelectionFlags;
+void channel_list_set_channel_selection(ChannelList *channel_list, guint32 id, ChannelListSetSelectionFlags flags);
 guint32 channel_list_get_channel_from_path(ChannelList *channel_list, GtkTreePath *path);
 guint32 channel_list_get_channel_selection(ChannelList *channel_list);
 GtkTreePath *channel_list_get_path_at_pos(ChannelList *channel_list, gint x, gint y);

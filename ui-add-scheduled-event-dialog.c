@@ -169,10 +169,11 @@ static void populate_widget(UiAddScheduledEventDialog *self)
     priv->channel_list = channel_list_new(TRUE);
     gtk_box_pack_start(GTK_BOX(hbox), priv->channel_list, TRUE, TRUE, 0);
 
-    GtkTreeView *tv = channel_list_get_tree_view(CHANNEL_LIST(priv->channel_list));
-    gtk_tree_view_set_activate_on_single_click(tv, TRUE);
-    g_signal_connect_swapped(G_OBJECT(tv), "cursor-changed",
-            G_CALLBACK(ui_add_scheduled_event_dialog_changed), self);
+    g_signal_connect_swapped(
+            G_OBJECT(priv->channel_list),
+            "channel-selected",
+            G_CALLBACK(ui_add_scheduled_event_dialog_changed),
+            self);
 
     priv->date_select = gtk_calendar_new();
     gtk_grid_attach(GTK_GRID(grid), priv->date_select, 0, 0, 2, 1);
@@ -242,7 +243,10 @@ void ui_add_scheduled_event_dialog_set_event(UiAddScheduledEventDialog *dialog, 
 
     priv->event = *event;
 
-    channel_list_set_channel_selection(CHANNEL_LIST(priv->channel_list), event->channel_id);
+    channel_list_set_channel_selection(
+            CHANNEL_LIST(priv->channel_list),
+            event->channel_id,
+            ChannelListSelectionScrollToCell);
 
     struct tm *tm = localtime((time_t *)&event->time_start);
     g_object_set(G_OBJECT(priv->date_select),
@@ -263,27 +267,11 @@ void ui_add_scheduled_event_dialog_set_event(UiAddScheduledEventDialog *dialog, 
 void ui_add_scheduled_event_dialog_update_event(UiAddScheduledEventDialog *dialog)
 {
     UiAddScheduledEventDialogPrivate *priv = ui_add_scheduled_event_dialog_get_instance_private(dialog);
-    GtkTreeView *tv = channel_list_get_tree_view(CHANNEL_LIST(priv->channel_list));
-    GtkTreePath *path = NULL;
-
     priv->validation_flags = 0;
 
-    GtkTreeIter iter;
-    GtkTreeModel *model = gtk_tree_view_get_model(tv);
-    gtk_tree_view_get_cursor(tv, &path, NULL);
-
-    if (!path || model == NULL || !gtk_tree_model_get_iter(model, &iter, path)) {
-        gtk_tree_path_free(path);
-    }
-    else {
-        guint32 selection_id;
-
-        gtk_tree_model_get(model, &iter, CHNL_ROW_ID, &selection_id, -1);
-
-        gtk_tree_path_free(path);
-
+    guint32 selection_id = channel_list_get_channel_selection(CHANNEL_LIST(priv->channel_list));
+    if (selection_id != CHANNEL_LIST_ID_INVALID) {
         priv->event.channel_id = selection_id;
-
         priv->validation_flags |= VALID_FLAG_CHANNEL;
     }
 

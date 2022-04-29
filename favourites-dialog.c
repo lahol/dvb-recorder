@@ -619,8 +619,7 @@ void channel_favourites_dialog_reset_favourites_channel_store(ChannelFavouritesD
 void channel_favourites_dialog_update_channel_list(ChannelFavouritesDialog *self)
 {
     ChannelFavouritesDialogPrivate *priv = channel_favourites_dialog_get_instance_private(self);
-    channel_list_clear(CHANNEL_LIST(priv->channel_all_list));
-    channel_db_foreach(0, (CHANNEL_DB_FOREACH_CALLBACK)channel_list_fill_cb, priv->channel_all_list);
+    channel_list_reset(CHANNEL_LIST(priv->channel_all_list), 0);
 }
 
 void channel_favourites_dialog_set_active_list(ChannelFavouritesDialog *self, guint32 list_id)

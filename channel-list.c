@@ -4,6 +4,8 @@
 
 #include "logging.h"
 
+#include <dvbrecorder/channel-db.h>
+
 typedef struct _ChannelListPrivate {
     GtkTreeModel *model;
 
@@ -20,6 +22,7 @@ typedef struct _ChannelListPrivate {
     GtkTreeSelection *selection;
 
     gboolean filterable;
+    gboolean change_on_select;
 
     gchar *filter_text;
     gchar *filter_source;
@@ -27,6 +30,8 @@ typedef struct _ChannelListPrivate {
     GList *active_sources;
     GQuark current_source;
     guint combo_box_changed_signal;
+
+    gulong cursor_changed_signal;
 } ChannelListPrivate;
 
 enum {
@@ -42,6 +47,7 @@ enum {
     PROP_MODEL,
     PROP_SELECTION,
     PROP_FILTERABLE,
+    PROP_CHANGE_ON_SELECT,
     N_PROPERTIES
 };
 
@@ -88,6 +94,9 @@ static void channel_list_set_property(GObject *object, guint prop_id,
             fprintf(stderr, "set filterable\n");
             channel_list_set_filterable(channel_list, g_value_get_boolean(value));
             break;
+        case PROP_CHANGE_ON_SELECT:
+            channel_list_set_change_on_select(channel_list, g_value_get_boolean(value));
+            break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, spec);
             break;
@@ -109,6 +118,9 @@ static void channel_list_get_property(GObject *object, guint prop_id,
             break;
         case PROP_FILTERABLE:
             g_value_set_boolean(value, priv->filterable);
+            break;
+        case PROP_CHANGE_ON_SELECT:
+            g_value_set_boolean(value, priv->change_on_select);
             break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, spec);
@@ -147,6 +159,13 @@ static void channel_list_class_init(ChannelListClass *klass)
                 "Create filter or not",
                 TRUE,
                 G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+    g_object_class_install_property(gobject_class,
+            PROP_CHANGE_ON_SELECT,
+            g_param_spec_boolean("change-on-select",
+                "ChangeOnSelect",
+                "Change channel on select",
+                FALSE,
+                G_PARAM_READWRITE));
 
     channel_list_signals[SIGNAL_CHANNEL_SELECTED] =
         g_signal_new("channel-selected",
@@ -188,6 +207,20 @@ static void _channel_list_channel_row_activated(
     g_return_if_fail(priv != NULL);
 
     guint32 selection_id = channel_list_get_channel_from_path(self, path);
+    g_signal_emit(self, channel_list_signals[SIGNAL_CHANNEL_SELECTED], 0, selection_id);
+}
+
+static void _channel_list_channel_cursor_changed(ChannelList *self, GtkTreeView *tree_view)
+{
+    LOG("cursor-changed\n");
+    g_return_if_fail(IS_CHANNEL_LIST(self));
+    ChannelListPrivate *priv = channel_list_get_instance_private(self);
+    g_return_if_fail(priv != NULL);
+
+    if (!priv->change_on_select)
+        return;
+
+    guint32 selection_id = channel_list_get_channel_selection(self);
     g_signal_emit(self, channel_list_signals[SIGNAL_CHANNEL_SELECTED], 0, selection_id);
 }
 
@@ -294,8 +327,18 @@ static void populate_widget(ChannelList *self)
             renderer, "text", CHNL_ROW_TITLE, "foreground", CHNL_ROW_FOREGROUND, NULL);
     gtk_tree_view_append_column(GTK_TREE_VIEW(priv->channel_tree_view), column);
 
-    g_signal_connect_swapped(G_OBJECT(priv->channel_tree_view), "row-activated",
-            G_CALLBACK(_channel_list_channel_row_activated), self);
+    gtk_tree_view_set_activate_on_single_click(GTK_TREE_VIEW(priv->channel_tree_view), TRUE);
+    g_signal_connect_swapped(
+            G_OBJECT(priv->channel_tree_view),
+            "row-activated",
+            G_CALLBACK(_channel_list_channel_row_activated),
+            self);
+    priv->cursor_changed_signal =
+        g_signal_connect_swapped(
+                G_OBJECT(priv->channel_tree_view),
+                "cursor-changed",
+                G_CALLBACK(_channel_list_channel_cursor_changed),
+                self);
 
     priv->selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(priv->channel_tree_view));
 
@@ -390,6 +433,14 @@ void channel_list_set_filterable(ChannelList *channel_list, gboolean filterable)
     gtk_widget_set_sensitive(priv->filter_entry, filterable);
 }
 
+void channel_list_set_change_on_select(ChannelList *channel_list, gboolean change_on_select)
+{
+    g_return_if_fail(IS_CHANNEL_LIST(channel_list));
+    ChannelListPrivate *priv = channel_list_get_instance_private(channel_list);
+
+    priv->change_on_select = change_on_select;
+}
+
 GtkTreeSelection *channel_list_get_selection(ChannelList *channel_list)
 {
     g_return_val_if_fail(IS_CHANNEL_LIST(channel_list), NULL);
@@ -442,6 +493,18 @@ void channel_list_fill_cb(ChannelData *data, ChannelList *channel_list)
         }
         g_signal_handler_unblock(priv->signal_source_widget, priv->combo_box_changed_signal);
     }
+}
+
+void channel_list_reset(ChannelList *channel_list, guint32 list_id)
+{
+    g_return_if_fail(IS_CHANNEL_LIST(channel_list));
+    ChannelListPrivate *priv = channel_list_get_instance_private(channel_list);
+    g_return_if_fail(priv != NULL);
+
+    g_signal_handler_block(priv->channel_tree_view, priv->cursor_changed_signal);
+    channel_list_clear(channel_list);
+    channel_db_foreach(list_id, (CHANNEL_DB_FOREACH_CALLBACK)channel_list_fill_cb, channel_list);
+    g_signal_handler_unblock(priv->channel_tree_view, priv->cursor_changed_signal);
 }
 
 void channel_list_clear(ChannelList *channel_list)
@@ -522,18 +585,31 @@ static gboolean channel_list_find_channel_by_id(ChannelList *self, guint32 id, G
     return FALSE;
 }
 
-void channel_list_set_channel_selection(ChannelList *channel_list, guint32 id)
+void channel_list_set_channel_selection(ChannelList *channel_list, guint32 id, ChannelListSetSelectionFlags flags)
 {
-    GtkTreeIter iter;
-    if (!channel_list_find_channel_by_id(channel_list, id, &iter))
-        return;
+    g_return_if_fail(IS_CHANNEL_LIST(channel_list));
     ChannelListPrivate *priv = channel_list_get_instance_private(channel_list);
+    g_return_if_fail(priv != NULL);
+
+    GtkTreeIter iter;
+    if (!channel_list_find_channel_by_id(channel_list, id, &iter)) {
+        GtkTreePath *invalid_path = gtk_tree_path_new();
+        gtk_tree_view_set_cursor(GTK_TREE_VIEW(priv->channel_tree_view), invalid_path, NULL, FALSE);
+        gtk_tree_path_free(invalid_path);
+        return;
+    }
 
     GtkTreePath *path = gtk_tree_model_get_path(GTK_TREE_MODEL(priv->channels_store), &iter);
 
     if (path) {
+        if (!(flags & ChannelListSelectionActivate))
+            g_signal_handler_block(priv->channel_tree_view, priv->cursor_changed_signal);
         gtk_tree_view_set_cursor(GTK_TREE_VIEW(priv->channel_tree_view), path, NULL, FALSE);
-        gtk_tree_view_scroll_to_cell(GTK_TREE_VIEW(priv->channel_tree_view), path, NULL, FALSE, 0, 0);
+        if (flags & ChannelListSelectionScrollToCell) {
+            gtk_tree_view_scroll_to_cell(GTK_TREE_VIEW(priv->channel_tree_view), path, NULL, FALSE, 0, 0);
+        }
+        if (!(flags & ChannelListSelectionActivate))
+            g_signal_handler_unblock(priv->channel_tree_view, priv->cursor_changed_signal);
         gtk_tree_path_free(path);
     }
 }
