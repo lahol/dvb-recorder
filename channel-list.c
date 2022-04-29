@@ -270,8 +270,11 @@ static void _channel_list_filter_changed(GtkWidget *widget, gpointer data)
     if (priv->filter_text)
         g_free(priv->filter_text);
     priv->filter_text = g_utf8_strdown(gtk_entry_get_text(GTK_ENTRY(widget)), -1);
-    if (priv->channels_filter_model)
+    if (priv->channels_filter_model) {
+        g_signal_handler_block(priv->channel_tree_view, priv->cursor_changed_signal);
         gtk_tree_model_filter_refilter(GTK_TREE_MODEL_FILTER(priv->channels_filter_model));
+        g_signal_handler_unblock(priv->channel_tree_view, priv->cursor_changed_signal);
+    }
 }
 
 static void _channel_list_signal_source_changed(ChannelList *self, GtkComboBox *box)
