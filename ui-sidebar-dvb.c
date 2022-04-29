@@ -140,15 +140,12 @@ static void _ui_sidebar_channels_channel_row_activated(UiSidebarChannels *sideba
 {
     LOG("row activated\n");
     g_return_if_fail(IS_UI_SIDEBAR_CHANNELS(sidebar));
-    GtkTreeIter iter;
-    GtkTreeModel *model = gtk_tree_view_get_model(tree_view);
-    if (model == NULL || !gtk_tree_model_get_iter(model, &iter, path)) {
+
+    UiSidebarChannelsPrivate *priv = ui_sidebar_channels_get_instance_private(sidebar);
+    if (priv == NULL)
         return;
-    }
 
-    guint32 selection_id;
-
-    gtk_tree_model_get(model, &iter, CHNL_ROW_ID, &selection_id, -1);
+    guint32 selection_id = channel_list_get_channel_from_path(CHANNEL_LIST(priv->channel_list), path);
 
     g_signal_emit(sidebar, ui_sidebar_signals[SIGNAL_CHANNEL_SELECTED], 0, selection_id);
 }
@@ -197,20 +194,9 @@ static gboolean _ui_sidebar_channels_channel_button_press(UiSidebarChannels *sid
 {
     UiSidebarChannelsPrivate *priv = ui_sidebar_channels_get_instance_private(sidebar);
     if (event->button == 3) {
-        GtkTreePath *path = NULL;
-        GtkTreeView *tv = channel_list_get_tree_view(CHANNEL_LIST(priv->channel_list));
-        if (tv && gtk_tree_view_get_path_at_pos(GTK_TREE_VIEW(tv),
-                    (gint)event->x, (gint)event->y,
-                    &path, NULL, NULL, NULL)) {
-            GtkTreeIter iter;
-            GtkTreeModel *model = gtk_tree_view_get_model(tv);
-            if (model == NULL || !gtk_tree_model_get_iter(model, &iter, path)) {
-                gtk_tree_path_free(path);
-                return TRUE;
-            }
-            guint32 channel_id;
-
-            gtk_tree_model_get(model, &iter, CHNL_ROW_ID, &channel_id, -1);
+        GtkTreePath *path = channel_list_get_path_at_pos(CHANNEL_LIST(priv->channel_list), (gint)event->x, (gint)event->y);
+        if (path != NULL) {
+            guint32 channel_id = channel_list_get_channel_from_path(CHANNEL_LIST(priv->channel_list), path);
             gtk_tree_path_free(path);
 
             _ui_sidebar_channels_context_popup_menu(sidebar, event, channel_id);
@@ -224,30 +210,17 @@ static gboolean _ui_sidebar_channels_channel_button_press(UiSidebarChannels *sid
 static void _ui_sidebar_channels_channel_cursor_changed(UiSidebarChannels *sidebar, GtkTreeView *tree_view)
 {
     LOG("cursor-changed\n");
+    fprintf(stderr, "sidebar channels channel cursor changed\n");
     gboolean cfg_channel_change_on_select = FALSE;
     if (config_get("main", "channel-change-on-select", CFG_TYPE_BOOLEAN, &cfg_channel_change_on_select) != 0)
         return;
     if (!cfg_channel_change_on_select)
         return;
 
-    GtkTreePath *path = NULL;
-    gtk_tree_view_get_cursor(tree_view, &path, NULL);
+    UiSidebarChannelsPrivate *priv = ui_sidebar_channels_get_instance_private(sidebar);
+    g_return_if_fail(priv != NULL);
 
-    if (!path)
-        return;
-
-    GtkTreeIter iter;
-    GtkTreeModel *model = gtk_tree_view_get_model(tree_view);
-    if (model == NULL || !gtk_tree_model_get_iter(model, &iter, path)) {
-        gtk_tree_path_free(path);
-        return;
-    }
-
-    guint32 selection_id;
-
-    gtk_tree_model_get(model, &iter, CHNL_ROW_ID, &selection_id, -1);
-
-    gtk_tree_path_free(path);
+    guint32 selection_id = channel_list_get_channel_selection(CHANNEL_LIST(priv->channel_list));
 
     LOG("cursor-changed: selection: %u\n", selection_id);
     g_signal_emit(sidebar, ui_sidebar_signals[SIGNAL_CHANNEL_SELECTED], 0, selection_id);
@@ -468,27 +441,7 @@ guint32 ui_sidebar_channels_get_current_channel(UiSidebarChannels *sidebar)
     g_return_val_if_fail(IS_UI_SIDEBAR_CHANNELS(sidebar), 0);
     UiSidebarChannelsPrivate *priv = ui_sidebar_channels_get_instance_private(sidebar);
 
-    GtkTreeIter iter;
-    GtkTreePath *path = NULL;
-
-    GtkTreeView *tv = channel_list_get_tree_view(CHANNEL_LIST(priv->channel_list));
-
-    gtk_tree_view_get_cursor(tv, &path, NULL);
-
-    if (!path)
-        return 0;
-
-    if (!gtk_tree_model_get_iter(GTK_TREE_MODEL(priv->channel_list_store), &iter, path)) {
-        gtk_tree_path_free(path);
-        return 0;
-    }
-    gtk_tree_path_free(path);
-
-    guint32 selection_id;
-
-    gtk_tree_model_get(GTK_TREE_MODEL(priv->channel_list_store), &iter, CHNL_ROW_ID, &selection_id, -1);
-
-    return selection_id;
+    return channel_list_get_channel_selection(CHANNEL_LIST(priv->channel_list));
 }
 
 void ui_sidebar_channels_set_current_channel(UiSidebarChannels *sidebar, guint32 id, gboolean activate)

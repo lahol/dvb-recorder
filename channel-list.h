@@ -46,6 +46,11 @@ void channel_list_clear(ChannelList *channel_list);
 void channel_list_set_active_signal_source(ChannelList *channel_list, const gchar *signal_source);
 const gchar *channel_list_get_active_signal_source(ChannelList *channel_list);
 
+#define CHANNEL_LIST_ID_INVALID ((guint32)0)
+
 void channel_list_set_channel_selection(ChannelList *channel_list, guint32 id);
+guint32 channel_list_get_channel_from_path(ChannelList *channel_list, GtkTreePath *path);
+guint32 channel_list_get_channel_selection(ChannelList *channel_list);
+GtkTreePath *channel_list_get_path_at_pos(ChannelList *channel_list, gint x, gint y);
 
 G_END_DECLS

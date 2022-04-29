@@ -503,3 +503,47 @@ void channel_list_set_channel_selection(ChannelList *channel_list, guint32 id)
     }
 }
 
+guint32 channel_list_get_channel_from_path(ChannelList *channel_list, GtkTreePath *path)
+{
+    g_return_val_if_fail(IS_CHANNEL_LIST(channel_list), CHANNEL_LIST_ID_INVALID);
+    g_return_val_if_fail(path != NULL, CHANNEL_LIST_ID_INVALID);
+    ChannelListPrivate *priv = channel_list_get_instance_private(channel_list);
+    g_return_val_if_fail(priv != NULL, CHANNEL_LIST_ID_INVALID);
+
+    GtkTreeIter iter;
+    GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW(priv->channel_tree_view));
+    if (model == NULL || !gtk_tree_model_get_iter(model, &iter, path)) {
+        return CHANNEL_LIST_ID_INVALID;
+    }
+
+    guint32 selection_id = CHANNEL_LIST_ID_INVALID;
+    gtk_tree_model_get(model, &iter, CHNL_ROW_ID, &selection_id, -1);
+
+    return selection_id;
+}
+
+guint32 channel_list_get_channel_selection(ChannelList *channel_list)
+{
+    g_return_val_if_fail(IS_CHANNEL_LIST(channel_list), CHANNEL_LIST_ID_INVALID);
+    ChannelListPrivate *priv = channel_list_get_instance_private(channel_list);
+    g_return_val_if_fail(priv != NULL, CHANNEL_LIST_ID_INVALID);
+
+    GtkTreePath *path = NULL;
+    gtk_tree_view_get_cursor(GTK_TREE_VIEW(priv->channel_tree_view), &path, NULL);
+
+    return channel_list_get_channel_from_path(channel_list, path);
+}
+
+GtkTreePath *channel_list_get_path_at_pos(ChannelList *channel_list, gint x, gint y)
+{
+    g_return_val_if_fail(IS_CHANNEL_LIST(channel_list), NULL);
+    ChannelListPrivate *priv = channel_list_get_instance_private(channel_list);
+    g_return_val_if_fail(priv != NULL, NULL);
+
+    GtkTreePath *path = NULL;
+    if (priv->channel_tree_view == NULL ||
+            !gtk_tree_view_get_path_at_pos(GTK_TREE_VIEW(priv->channel_tree_view), x, y, &path, NULL, NULL, NULL))
+        return NULL;
+
+    return path;
+}
