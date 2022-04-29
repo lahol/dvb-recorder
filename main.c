@@ -1007,7 +1007,13 @@ void main_recorder_sidebar_signal_source_changed_cb(UiSidebarChannels *sidebar, 
 
 void main_recorder_sidebar_show_channel_details_cb(UiSidebarChannels *sidebar, GQuark action, guint32 channel_id, gpointer userdata)
 {
-    ui_channel_properties_dialog_set_channel_id(UI_CHANNEL_PROPERTIES_DIALOG(widgets.channel_properties_dialog), channel_id);
+    main_window_status_set_show(
+            widgets.channel_properties_dialog,
+            &appstatus.gui.channel_properties_dialog,
+            TRUE);
+    ui_channel_properties_dialog_set_channel_id(
+            UI_CHANNEL_PROPERTIES_DIALOG(widgets.channel_properties_dialog),
+            channel_id);
 }
 
 void main_ui_update_button_status(void)
