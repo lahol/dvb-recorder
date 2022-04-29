@@ -179,45 +179,6 @@ static void _ui_sidebar_channels_context_popup_menu(UiSidebarChannels *sidebar, 
 #endif
 }
 
-static gboolean _ui_sidebar_channels_channel_button_press(UiSidebarChannels *sidebar, GdkEventButton *event,
-        GtkTreeView *tree_view)
-{
-    UiSidebarChannelsPrivate *priv = ui_sidebar_channels_get_instance_private(sidebar);
-    if (event->button == 3) {
-        GtkTreePath *path = channel_list_get_path_at_pos(CHANNEL_LIST(priv->channel_list), (gint)event->x, (gint)event->y);
-        if (path != NULL) {
-            guint32 channel_id = channel_list_get_channel_from_path(CHANNEL_LIST(priv->channel_list), path);
-            gtk_tree_path_free(path);
-
-            _ui_sidebar_channels_context_popup_menu(sidebar, event, channel_id);
-        }
-        return TRUE;
-    }
-
-    return FALSE;
-}
-
-#if 0
-static void _ui_sidebar_channels_channel_cursor_changed(UiSidebarChannels *sidebar, GtkTreeView *tree_view)
-{
-    LOG("cursor-changed\n");
-    fprintf(stderr, "sidebar channels channel cursor changed\n");
-    gboolean cfg_channel_change_on_select = FALSE;
-    if (config_get("main", "channel-change-on-select", CFG_TYPE_BOOLEAN, &cfg_channel_change_on_select) != 0)
-        return;
-    if (!cfg_channel_change_on_select)
-        return;
-
-    UiSidebarChannelsPrivate *priv = ui_sidebar_channels_get_instance_private(sidebar);
-    g_return_if_fail(priv != NULL);
-
-    guint32 selection_id = channel_list_get_channel_selection(CHANNEL_LIST(priv->channel_list));
-
-    LOG("cursor-changed: selection: %u\n", selection_id);
-    g_signal_emit(sidebar, ui_sidebar_signals[SIGNAL_CHANNEL_SELECTED], 0, selection_id);
-}
-#endif
-
 static void _ui_sidebar_channels_signal_source_changed(UiSidebarChannels *sidebar, gchar *signal_source, ChannelList *channel_list)
 {
     g_signal_emit(sidebar, ui_sidebar_signals[SIGNAL_SIGNAL_SOURCE_CHANGED], 0, signal_source);
@@ -299,11 +260,10 @@ static void populate_widget(UiSidebarChannels *self)
     {
         channel_list_set_change_on_select(CHANNEL_LIST(priv->channel_list), cfg_channel_change_on_select);
     }
-    GtkTreeView *tv = channel_list_get_tree_view(CHANNEL_LIST(priv->channel_list));
     g_signal_connect_swapped(G_OBJECT(priv->channel_list), "channel-selected",
             G_CALLBACK(_ui_sidebar_channels_channel_channel_selected), self);
-    g_signal_connect_swapped(G_OBJECT(tv), "button-press-event",
-            G_CALLBACK(_ui_sidebar_channels_channel_button_press), self);
+    g_signal_connect_swapped(G_OBJECT(priv->channel_list), "channel-context-menu",
+            G_CALLBACK(_ui_sidebar_channels_context_popup_menu), self);
     g_signal_connect_swapped(G_OBJECT(priv->channel_list), "signal-source-changed",
             G_CALLBACK(_ui_sidebar_channels_signal_source_changed), self);
 

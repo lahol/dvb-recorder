@@ -54,6 +54,7 @@ enum {
 enum {
     SIGNAL_CHANNEL_SELECTED = 0,
     SIGNAL_SIGNAL_SOURCE_CHANGED = 1,
+    SIGNAL_CHANNEL_CONTEXT_MENU = 2,
     N_SIGNALS
 };
 
@@ -192,6 +193,20 @@ static void channel_list_class_init(ChannelListClass *klass)
                 1,
                 G_TYPE_STRING,
                 NULL);
+
+    channel_list_signals[SIGNAL_CHANNEL_CONTEXT_MENU] =
+        g_signal_new("channel-context-menu",
+                G_TYPE_FROM_CLASS(gobject_class),
+                G_SIGNAL_RUN_LAST,
+                0,
+                NULL,
+                NULL,
+                NULL,
+                G_TYPE_NONE,
+                2,
+                GDK_TYPE_EVENT,
+                G_TYPE_UINT,
+                NULL);
 }
 
 static void _channel_list_channel_row_activated(
@@ -222,6 +237,29 @@ static void _channel_list_channel_cursor_changed(ChannelList *self, GtkTreeView 
 
     guint32 selection_id = channel_list_get_channel_selection(self);
     g_signal_emit(self, channel_list_signals[SIGNAL_CHANNEL_SELECTED], 0, selection_id);
+}
+
+static gboolean _channel_list_channel_button_press(ChannelList *channel_list, GdkEventButton *event, GtkTreeView *tree_view)
+{
+    g_return_val_if_fail(IS_CHANNEL_LIST(channel_list), FALSE);
+    ChannelListPrivate *priv = channel_list_get_instance_private(channel_list);
+    g_return_val_if_fail(priv != NULL, FALSE);
+    if (event->button == 3) {
+        GtkTreePath *path = channel_list_get_path_at_pos(channel_list, (gint)event->x, (gint)event->y);
+        if (path != NULL) {
+            guint32 channel_id = channel_list_get_channel_from_path(channel_list, path);
+            gtk_tree_path_free(path);
+
+            g_signal_emit(
+                    channel_list,
+                    channel_list_signals[SIGNAL_CHANNEL_CONTEXT_MENU],
+                    0,
+                    event,
+                    channel_id);
+        }
+        return TRUE;
+    }
+    return FALSE;
 }
 
 /* data = ChannelListPrivate */
@@ -339,6 +377,11 @@ static void populate_widget(ChannelList *self)
                 "cursor-changed",
                 G_CALLBACK(_channel_list_channel_cursor_changed),
                 self);
+    g_signal_connect_swapped(
+            G_OBJECT(priv->channel_tree_view),
+            "button-press-event",
+            G_CALLBACK(_channel_list_channel_button_press),
+            self);
 
     priv->selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(priv->channel_tree_view));
 
