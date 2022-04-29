@@ -389,12 +389,11 @@ static gboolean main_key_press_event(GtkWidget *widget, GdkEventKey *event, gpoi
     fprintf(stderr, "key press for event: type: %s\n", focus_widget ?
             G_OBJECT_TYPE_NAME(focus_widget) : "GtkNone");
 
-    guint focus_type = focus_widget ? G_OBJECT_TYPE(focus_widget) : G_TYPE_INVALID;
-
     /* ignore simple key presses if we are in a GtkEntry */
-    if (focus_type == GTK_TYPE_ENTRY) {
+    if (GTK_IS_ENTRY(focus_widget)) {
         if ((event->state & ~(GDK_SHIFT_MASK | GDK_RELEASE_MASK)) == 0)
-            return FALSE;
+            if (gtk_widget_event(focus_widget, (GdkEvent *)event))
+                return TRUE;
     }
 
     Command *cmd = cmd_find(appdata.command_mode, event->keyval, event->state);
