@@ -40,7 +40,7 @@ struct _VideoOutput {
     GstElement *asink;
 
     GstElement *tee;
-    GstElement *appsink;
+    GstElement *snapshotsink;
 
     GstElement *audio_input_selector;
     GQueue audio_channels;
@@ -204,7 +204,7 @@ gboolean video_output_snapshot(VideoOutput *vo, const gchar *filename)
     /*
     g_signal_emit_by_name(vo->playsink, "convert-sample", caps, &sample);
     */
-    GstSample *rawsample = gst_app_sink_pull_sample(GST_APP_SINK(vo->appsink));
+    GstSample *rawsample = gst_app_sink_pull_sample(GST_APP_SINK(vo->snapshotsink));
     if (rawsample == NULL)
         goto error;
 
@@ -650,6 +650,31 @@ void video_output_set_overlay_surface(VideoOutput *vo, cairo_surface_t *overlay)
         cairo_surface_destroy(overlay);
 }
 
+/** @brief Safely link two pads.
+ *  @param[in] src The source pad.
+ *  @param[in] sink The sink pad.
+ *  @param[in] description Description of the link, for debug output. May be NULL.
+ *  @return Whether the linking was successful.
+ */
+static gboolean _video_output_link_pads(GstPad *src, GstPad *sink, const gchar *description)
+{
+    if (src == NULL || sink == NULL) {
+        LOG("Link pads: one is NULL, %p -> %p (%s)\n", src, sink, description);
+        return FALSE;
+    }
+    GstPadLinkReturn ret = gst_pad_link(src, sink);
+    if (GST_PAD_LINK_FAILED(ret)) {
+        LOG("Link pads failed: %s\n", description);
+        return FALSE;
+    }
+
+    g_object_unref(src);
+    g_object_unref(sink);
+    LOG("Link pads successful: %s\n", description);
+
+    return TRUE;
+}
+
 void video_output_setup_pipeline(VideoOutput *vo)
 {
     LOG("video_output_setup_pipeline: %p\n", vo->pipeline);
@@ -659,9 +684,11 @@ void video_output_setup_pipeline(VideoOutput *vo)
         return;
     }
 
+    /* Setup pipeline */
     LOG("new pipeline\n");
     vo->pipeline = gst_pipeline_new(NULL);
 
+    /* Create video sink */
     LOG("make xvimagesink (br: %d, cont: %d, hue: %d, sat: %d)\n",
             vo->video_brightness, vo->video_contrast, vo->video_hue, vo->video_saturation);
     vo->vsink = gst_element_factory_make("xvimagesink", "xvimagesink");
@@ -670,41 +697,43 @@ void video_output_setup_pipeline(VideoOutput *vo)
                  NULL);
     LOG("xvimagesink: %p\n", vo->vsink);
 
-/*    vo->asink = gst_element_factory_make("alsasink", "alsasink");
-    LOG("audiosink: %p\n", vo->asink);
-*/
+    /* Create input selector for audio channels. */
     vo->audio_input_selector = gst_element_factory_make("input-selector", "audioinputselector");
     LOG("input-selector: %p\n", vo->audio_input_selector);
 
+    /* Create playsink, containing videosink */
     LOG("make playsink\n");
     vo->playsink = gst_element_factory_make("playsink", "playsink");
     g_object_set(G_OBJECT(vo->playsink),
             "video-sink", vo->vsink,
-/*            "audio-sink", vo->asink,*/
             "volume", vo->volume,
             "mute", vo->is_muted,
             NULL);
 
+    /* Split video to video for presentation, and for bypassing to get screenshots. */
     vo->tee = gst_element_factory_make("tee", "videotee");
     LOG("videotee: %p\n", vo->tee);
-    vo->appsink = gst_element_factory_make("appsink", "appsink");
-    LOG("appsink: %p\n", vo->appsink);
-    gst_app_sink_set_max_buffers(GST_APP_SINK(vo->appsink), 1);
-    gst_app_sink_set_drop(GST_APP_SINK(vo->appsink), TRUE);
+
+    /* Create video sink for snapshots. */
+    vo->snapshotsink = gst_element_factory_make("appsink", "snapshotsink");
+    LOG("snapshotsink: %p\n", vo->snapshotsink);
+    gst_app_sink_set_max_buffers(GST_APP_SINK(vo->snapshotsink), 1);
+    gst_app_sink_set_drop(GST_APP_SINK(vo->snapshotsink), TRUE);
 
 
+    /* Create input from file descriptor */
     LOG("video_output_setup_pipeline, make fdsrc\n");
     GstElement *source = gst_element_factory_make("fdsrc", "fdsrc");
     LOG("fdsrc: %d\n", vo->infile);
     g_object_set(G_OBJECT(source), "fd", vo->infile, NULL);
     gst_base_src_set_live(GST_BASE_SRC(source), TRUE);
 
-    /* check if textoverlay/textrender suffices and we can get rid of videoconvert */
+    /* Create overlay filter for cairo surfaces. */
     vo->cairooverlay = gst_element_factory_make("cairostaticoverlay", "cairooverlay");
-    /* videoconvert was ffmpegcolorspace before 1.0 */
     g_signal_connect(G_OBJECT(vo->cairooverlay), "info-changed",
             G_CALLBACK(video_output_cairo_info_changed), vo);
 
+    /* Create decoder, which handles all conversion. */
 #if GST_CHECK_VERSION(1, 0, 0)
     GstElement *decoder = gst_element_factory_make("decodebin", "decodebin");
 #else
@@ -717,100 +746,64 @@ void video_output_setup_pipeline(VideoOutput *vo)
     g_signal_connect(G_OBJECT(decoder), "drained",
             G_CALLBACK(video_output_decoder_drained_cb), vo);
 
+    /* Add all elements to the pipeline */
     LOG("pipeline: %p, source: %p, decoder: %p\n",
             vo->pipeline, source, decoder);
-    gst_bin_add_many(GST_BIN(vo->pipeline), source, decoder, vo->audio_input_selector, vo->tee, vo->appsink, vo->cairooverlay,
+    gst_bin_add_many(GST_BIN(vo->pipeline), source, decoder, vo->audio_input_selector, vo->tee, vo->snapshotsink, vo->cairooverlay,
             vo->playsink, NULL);
+
+    /* Link elements */
+
+    /* Link source -> decoder */
     if (!gst_element_link(source, decoder)) {
         LOG("Elements could not be linked. (source -> decoder)\n");
     }
 
-#if GST_CHECK_VERSION(1, 20, 0)
-    GstPad *playsink_video_pad = gst_element_request_pad_simple(vo->playsink, "video_sink");
-#else
-    GstPad *playsink_video_pad = gst_element_get_request_pad(vo->playsink, "video_sink");
-#endif
-    video_output_add_request_pad(vo, vo->playsink, playsink_video_pad);
-    GstPad *videoconvert_pad = gst_element_get_static_pad(vo->cairooverlay, "src");
-    GstPadLinkReturn ret;
-    if (playsink_video_pad && videoconvert_pad) {
-        ret = gst_pad_link(videoconvert_pad, playsink_video_pad);
-        if (GST_PAD_LINK_FAILED(ret))
-            LOG("Linking overlay -> playsink failed\n");
-        else
-            LOG("Linking successful\n");
-    }
-    else {
-        LOG("Could not request video pad or convert pad: %p, %p\n", playsink_video_pad, videoconvert_pad);
-    }
-
-    GstPad *main_video_pad = gst_element_get_static_pad(vo->cairooverlay, "sink");
+    /* Video */
+    /* Link video split -> cairo filter */
 #if GST_CHECK_VERSION(1, 20, 0)
     GstPad *video_tee_pad = gst_element_request_pad_simple(vo->tee, "src_%u");
 #else
     GstPad *video_tee_pad = gst_element_get_request_pad(vo->tee, "src_%u");
 #endif
     video_output_add_request_pad(vo, vo->tee, video_tee_pad);
-    if (main_video_pad && video_tee_pad) {
-        ret = gst_pad_link(video_tee_pad, main_video_pad);
-        if (GST_PAD_LINK_FAILED(ret))
-            LOG("Linking tee -> cairooverlay failed\n");
-        else
-            LOG("Linking successful\n");
-    }
-    else {
-        LOG("Could not request tee or overlay pad: %p, %p\n", video_tee_pad, main_video_pad);
-    }
-    if (video_tee_pad)
-        gst_object_unref(video_tee_pad);
+    GstPad *cairooverlaysink = gst_element_get_static_pad(vo->cairooverlay, "sink");
+    _video_output_link_pads(video_tee_pad, cairooverlaysink, "video split -> cairo filter");
 
-    GstPad *app_video_pad = gst_element_get_static_pad(vo->appsink, "sink");
+    /* Link cairo filter -> video sink */
+    GstPad *cairooverlaysrc = gst_element_get_static_pad(vo->cairooverlay, "src");
+#if GST_CHECK_VERSION(1, 20, 0)
+    GstPad *playsink_video_pad = gst_element_request_pad_simple(vo->playsink, "video_sink");
+#else
+    GstPad *playsink_video_pad = gst_element_get_request_pad(vo->playsink, "video_sink");
+#endif
+    video_output_add_request_pad(vo, vo->playsink, playsink_video_pad);
+    _video_output_link_pads(cairooverlaysrc, playsink_video_pad, "cairo filter -> xv video sink");
+
+    /* Link video split -> snapshot */
 #if GST_CHECK_VERSION(1, 20, 0)
     video_tee_pad = gst_element_request_pad_simple(vo->tee, "src_%u");
 #else
     video_tee_pad = gst_element_get_request_pad(vo->tee, "src_%u");
 #endif
     video_output_add_request_pad(vo, vo->tee, video_tee_pad);
-    if (app_video_pad && video_tee_pad) {
-        ret = gst_pad_link(video_tee_pad, app_video_pad);
-        if (GST_PAD_LINK_FAILED(ret))
-            LOG("Linking tee -> appsink\n");
-        else
-            LOG("Linking successful\n");
-    }
-    else {
-        LOG("Could not request tee or appsink pad: %p, %p\n", video_tee_pad, app_video_pad);
-    }
-    if (video_tee_pad)
-        gst_object_unref(video_tee_pad);
+    GstPad *snapshotsink = gst_element_get_static_pad(vo->snapshotsink, "sink");
+    _video_output_link_pads(video_tee_pad, snapshotsink, "video split -> snapshot");
 
+
+    /* Audio */
+    /* Link audio selector -> playsink */
+    GstPad *input_selector_pad = gst_element_get_static_pad(vo->audio_input_selector, "src");
 #if GST_CHECK_VERSION(1, 20, 0)
     GstPad *playsink_audio_pad = gst_element_request_pad_simple(vo->playsink, "audio_sink");
 #else
     GstPad *playsink_audio_pad = gst_element_get_request_pad(vo->playsink, "audio_sink");
 #endif
     video_output_add_request_pad(vo, vo->playsink, playsink_audio_pad);
-    GstPad *input_selector_pad = gst_element_get_static_pad(vo->audio_input_selector, "src");
-    if (playsink_audio_pad && input_selector_pad) {
-        ret = gst_pad_link(input_selector_pad, playsink_audio_pad);
-        if (GST_PAD_LINK_FAILED(ret))
-            LOG("Linking input-selector -> playsink failed\n");
-        else
-            LOG("Linking successful\n");
-    }
-    else {
-        LOG("Could not request audio pad or input-selector pad: %p, %p\n", playsink_audio_pad, input_selector_pad);
-    }
+    _video_output_link_pads(input_selector_pad, playsink_audio_pad, "audio select -> playsink audio");
 
-    if (playsink_audio_pad)
-        gst_object_unref(playsink_audio_pad);
-    if (playsink_video_pad)
-        gst_object_unref(playsink_video_pad);
-    if (videoconvert_pad)
-        gst_object_unref(videoconvert_pad);
-    if (input_selector_pad)
-        gst_object_unref(input_selector_pad);
 
+    /* Setup bus */
     GstBus *bus = gst_element_get_bus(GST_ELEMENT(vo->pipeline));
 #if GST_CHECK_VERSION(1, 0, 0)
     gst_bus_set_sync_handler(bus, (GstBusSyncHandler)video_output_bus_sync_handler, vo, NULL);
@@ -818,7 +811,6 @@ void video_output_setup_pipeline(VideoOutput *vo)
     gst_bus_set_sync_handler(bus, (GstBusSyncHandler)video_output_bus_sync_handler, vo);
 #endif
     gst_bus_add_signal_watch(bus);
-/*    gst_bus_add_watch(bus, (GstBusFunc)video_output_gst_message, vo);*/
     g_signal_connect(G_OBJECT(bus), "message::error",
             G_CALLBACK(video_output_gst_error_cb), vo);
     g_signal_connect(G_OBJECT(bus), "message::eos",
