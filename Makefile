@@ -13,10 +13,10 @@ else
 	LIBS   += `$(PKG_CONFIG) --libs gstreamer-1.0 gstreamer-plugins-base-1.0 gstreamer-base-1.0` -lgstvideo-1.0 -lgstaudio-1.0 -lgstapp-1.0
 endif
 
-ifdef RELEASE
-	CFLAGS += -O2
-else
+ifdef DEBUG
 	CFLAGS += -g
+else
+	CFLAGS += -O2
 endif
 
 RCVERSION := '$(shell git describe --tags --always) ($(shell git log --pretty=format:%cd --date=short -n1), branch \"$(shell git describe --tags --always --all | sed s:heads/::)\")'
