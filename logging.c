@@ -18,7 +18,7 @@ void log_reinit(void)
                 NULL);
     }
 
-    strncpy(log_filename, fname, 1024);
+    strncpy(log_filename, fname, 1023);
     initalized = TRUE;
 
     g_free(fname);

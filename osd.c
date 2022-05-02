@@ -174,12 +174,14 @@ void osd_update_overlay(OSD *osd)
     osd->width = width * pixelaspect;
     osd->height = height;
 
+    cairo_t *cr = NULL;
+
     cairo_surface_t *surf = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, width, height);
     if (!surf) {
         goto err;
     }
 
-    cairo_t *cr = cairo_create(surf);
+    cr = cairo_create(surf);
     if (!cr)
         goto err;
 

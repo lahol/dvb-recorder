@@ -104,7 +104,6 @@ void epg_event_widget_update_event(EpgEventWidget *self)
     if (priv->expander) {
         tm = localtime(&priv->event->starttime);
         strftime(tbuf, 64, "%d.%m. %H:%M", tm);
-        fprintf(stderr, "se->desc: %s\n", se ? se->description : NULL);
         buf = g_strdup_printf("%s <b>%s</b>", tbuf, se ? se->description : "<i>no title</i>");
         gtk_expander_set_label(GTK_EXPANDER(priv->expander), buf);
     }
