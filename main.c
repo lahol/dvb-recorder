@@ -396,7 +396,9 @@ static gboolean main_key_press_event(GtkWidget *widget, GdkEventKey *event, gpoi
                 return TRUE;
     }
 
-    Command *cmd = cmd_find(appdata.command_mode, event->keyval, event->state);
+    /* Mask innocuous modifiers like NumLock, CapsLock, that are not actively pressed. */
+    guint modifier_mask = gtk_accelerator_get_default_mod_mask();
+    Command *cmd = cmd_find(appdata.command_mode, event->keyval, event->state & modifier_mask);
     if (!cmd)
         return FALSE;
 
