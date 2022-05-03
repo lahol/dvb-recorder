@@ -1346,6 +1346,7 @@ int main(int argc, char **argv)
 
     appdata.ignore_events = 1;
     status_save(&appstatus, status_file);
+    g_free(status_file);
 
     osd_cleanup(appdata.osd);
     LOG("disable video source\n");
@@ -1378,7 +1379,6 @@ int main(int argc, char **argv)
         g_object_unref(G_OBJECT(appdata.blank_cursor));
     g_free(appdata.rec_status_format_normal);
     g_free(appdata.rec_status_format_recording);
-
 
     LOG("done\n");
     return 0;
